@@ -1,0 +1,182 @@
+# ---------- Secrets / config ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.toml
+credentials.json
+service_account*.json
+.streamlit/secrets.toml
+
+# ---------- Virtual environments ----------
+.venv/
+venv/
+env/
+ENV/
+pyvenv.cfg
+# venv created directly in the project root (python -m venv .)
+/bin/
+/include/
+/lib/
+/lib64/
+/share/
+/Scripts/
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+
+# ---------- Tooling caches ----------
+.mypy_cache/
+.dmypy.json
+.pytype/
+.ruff_cache/
+.pytest_cache/
+.tox/
+.nox/
+.cache/
+.hypothesis/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+nosetests.xml
+
+# ---------- Notebooks ----------
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+profile_default/
+ipython_config.py
+
+# ---------- Vector stores / indexes ----------
+chroma/
+chroma_db/
+.chroma/
+*.chroma
+faiss_index/
+*.faiss
+*.index
+*.pkl
+*.pickle
+lancedb/
+qdrant_storage/
+milvus_data/
+weaviate_data/
+storage/
+index_store/
+vector_store/
+docstore.json
+.pgvector/
+
+# ---------- LangChain / LLM caches ----------
+.langchain.db
+langchain.db
+.langchain/
+.cache_embeddings/
+llm_cache.db
+.semantic_cache/
+
+# ---------- Model & embedding downloads ----------
+models/
+checkpoints/
+*.bin
+*.gguf
+*.safetensors
+*.onnx
+*.pt
+*.pth
+.hf_cache/
+huggingface/
+sentence_transformers_cache/
+nltk_data/
+.torch/
+
+# ---------- Data ----------
+# Ignore ingested / generated data, keep small seed corpora if you need them.
+data/raw/
+data/processed/
+data/interim/
+data/external/
+uploads/
+tmp_uploads/
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb
+# Uncomment if source documents are large or private:
+# data/
+# *.pdf
+# *.csv
+# *.parquet
+
+# ---------- Logs / runtime ----------
+logs/
+*.log
+*.log.*
+nohup.out
+celerybeat-schedule
+celerybeat.pid
+*.pid
+.chainlit/
+.files/
+.gradio/
+flagged/
+outputs/
+runs/
+wandb/
+mlruns/
+.langfuse/
+
+# ---------- Web / frontend (if you add one) ----------
+node_modules/
+.next/
+.nuxt/
+.parcel-cache/
+npm-debug.log*
+yarn-error.log*
+
+# ---------- Editors / IDE ----------
+.vscode/
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.ropeproject
+
+# ---------- OS ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ---------- Misc ----------
+.python-version
+.pdm-python
+Pipfile.lock
+poetry.toml
+.direnv/
+*.bak
+*.tmp
