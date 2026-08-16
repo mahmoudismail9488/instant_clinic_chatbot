@@ -1,0 +1,1 @@
+"""Instant Clinic backend package."""

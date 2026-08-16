@@ -185,7 +185,10 @@ poetry.toml
 
 
 # ---------- Data ----------
-data/
+# Keep seed guidelines; ignore generated vector index.
+data/index/
+data/uploads/*
+!data/uploads/.gitkeep
 
 # ---------- Graphify ----------
 graphify/
