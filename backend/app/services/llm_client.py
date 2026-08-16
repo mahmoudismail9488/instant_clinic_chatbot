@@ -37,6 +37,24 @@ class LLMClient:
         payloads = [t[:8000] for t in texts]
         return [vec.tolist() for vec in model.embed(payloads)]
 
+    def chat(
+        self,
+        *,
+        system: str,
+        user: str,
+        temperature: float = 0.2,
+    ) -> str:
+        response = self._client.chat.completions.create(
+            model=self.settings.groq_ai_model,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+        content = response.choices[0].message.content
+        return (content or "").strip()
+
     def generate(self, *, query: str, context: str) -> str:
         system = (
             "You are Instant Clinic, a clinical decision-support assistant. "
@@ -50,13 +68,4 @@ class LLMClient:
             f"Guideline excerpts:\n{context}\n\n"
             "Answer:"
         )
-        response = self._client.chat.completions.create(
-            model=self.settings.groq_ai_model,
-            temperature=0.2,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        )
-        content = response.choices[0].message.content
-        return (content or "").strip()
+        return self.chat(system=system, user=user, temperature=0.2)

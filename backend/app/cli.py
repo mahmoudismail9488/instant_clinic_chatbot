@@ -11,9 +11,41 @@ from backend.app.pipeline.run import build_index, run_query
 
 
 def _print_query_result(result) -> None:
+    print("\n=== Query rewrite ===\n")
+    print(f"original : {result.original_query}")
+    print(f"rewritten: {result.rewritten_query}")
+
+    if result.blocked:
+        print("\n=== Guardrails ===\n")
+        reason = result.guardrail.reason if result.guardrail else "blocked"
+        print(f"BLOCKED — {reason}")
+        print("\n=== Answer ===\n")
+        print(result.answer)
+        return
+
     print("\n=== Answer ===\n")
     print(result.answer)
-    print("\n=== Related chunks ===\n")
+
+    if result.conflict is not None:
+        print("\n=== Conflict detection ===\n")
+        if result.conflict.has_conflict:
+            print(result.conflict.summary or "Conflict flagged")
+            if result.conflict.sources:
+                print("sources:", ", ".join(result.conflict.sources))
+        else:
+            print("No material conflict detected across retrieved sources.")
+
+    print("\n=== Evidence / citations ===\n")
+    if not result.citations:
+        print("(none)")
+    else:
+        for i, cite in enumerate(result.citations, start=1):
+            excerpt = textwrap.shorten(cite.excerpt, width=280, placeholder=" …")
+            print(f"[{i}] score={cite.score:.3f}  source={cite.source}  chunk={cite.chunk_index}")
+            print(f"    {excerpt}")
+            print()
+
+    print("=== Related chunks ===\n")
     if not result.chunks:
         print("(none)")
         return
@@ -45,7 +77,7 @@ def cmd_query(args: argparse.Namespace) -> int:
         return 2
     result = run_query(query, top_k=args.top_k)
     _print_query_result(result)
-    return 0
+    return 0 if not result.blocked else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
