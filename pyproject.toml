@@ -1,0 +1,17 @@
+[project]
+name = "instant-clinic-chatbot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ahmed Nagah", email = "ahmednagah031220@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+instant-clinic-chatbot = "instant_clinic_chatbot:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
