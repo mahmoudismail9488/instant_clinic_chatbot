@@ -114,6 +114,8 @@ data/raw/
 data/processed/
 data/interim/
 data/external/
+data/uploads/*
+!data/uploads/.gitkeep
 uploads/
 tmp_uploads/
 *.sqlite
@@ -180,3 +182,14 @@ poetry.toml
 .direnv/
 *.bak
 *.tmp
+
+
+# ---------- Data ----------
+data/
+
+# ---------- Graphify ----------
+graphify/
+graphify_data/
+graphify-out/
+
+
