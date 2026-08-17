@@ -1,8 +1,9 @@
-"""Stage 4 — retrieve top-k chunks from the vector store."""
+"""Stage 4 — retrieve top-k chunks using hybrid search (Dense + BM25 RRF)."""
 
 from dataclasses import dataclass
 
 from backend.app.pipeline.chunking import infer_section_title
+from backend.app.pipeline.hybrid_search import rrf_hybrid_merge
 from backend.app.services.llm_client import LLMClient
 from backend.app.services.vector_store import VectorStore
 
@@ -25,11 +26,20 @@ def retrieve(
     top_k: int = 5,
     store: VectorStore | None = None,
     client: LLMClient | None = None,
+    use_hybrid: bool = True,
 ) -> list[RetrievedChunk]:
     llm = client or LLMClient()
     vector_store = store or VectorStore()
+
     query_embedding = llm.embed([query])[0]
-    hits = vector_store.similarity_search(query_embedding, top_k=top_k)
+    dense_hits = vector_store.similarity_search(query_embedding, top_k=top_k * 3)
+
+    if use_hybrid:
+        all_docs = vector_store.get_all_documents()
+        hits = rrf_hybrid_merge(dense_hits, all_docs, query=query, top_k=top_k)
+    else:
+        hits = dense_hits[:top_k]
+
     results: list[RetrievedChunk] = []
     for hit in hits:
         meta = hit.get("metadata") or {}
@@ -41,9 +51,9 @@ def retrieve(
             RetrievedChunk(
                 text=text,
                 score=float(hit["score"]),
-                source=str(hit["source"]),
-                source_path=str(hit.get("source_path", "")),
-                chunk_index=int(hit.get("chunk_index", 0)),
+                source=str(hit.get("source", meta.get("source", ""))),
+                source_path=str(hit.get("source_path", meta.get("source_path", ""))),
+                chunk_index=int(hit.get("chunk_index", meta.get("chunk_index", 0))),
                 page=int(page) if page is not None else None,
                 section_number=str(section_number) if section_number else None,
                 section_title=infer_section_title(

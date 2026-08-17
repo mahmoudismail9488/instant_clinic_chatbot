@@ -129,3 +129,23 @@ class VectorStore:
                 }
             )
         return results
+
+    def get_all_documents(self) -> list[dict[str, Any]]:
+        """Return all stored documents formatted for lexical/BM25 retrieval."""
+        results: list[dict[str, Any]] = []
+        for chunk in self._chunks:
+            meta = chunk.metadata or {}
+            results.append(
+                {
+                    "id": chunk.id,
+                    "text": chunk.text,
+                    "source": chunk.source,
+                    "source_path": chunk.source_path,
+                    "chunk_index": chunk.chunk_index,
+                    "page": meta.get("page"),
+                    "section_number": meta.get("section_number"),
+                    "section_title": meta.get("section_title"),
+                    "metadata": meta,
+                }
+            )
+        return results
