@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from backend.app.config import Settings, get_settings
-from backend.app.pipeline.chunking import chunk_text
+from backend.app.pipeline.chunking import chunk_units
 from backend.app.pipeline.conflict_detection import ConflictReport, detect_conflicts
 from backend.app.pipeline.embeddings import embed_texts
 from backend.app.pipeline.evidence import Citation, build_citations
@@ -50,8 +50,8 @@ def build_index(
     total_chunks = 0
 
     for doc in docs:
-        chunks = chunk_text(
-            doc.text,
+        chunks = chunk_units(
+            doc.units,
             source=doc.source,
             source_path=str(doc.source_path),
             chunk_size=cfg.chunk_size,
@@ -74,6 +74,9 @@ def build_index(
                         "source": c.source,
                         "source_path": c.source_path,
                         "chunk_index": c.index,
+                        "page": c.page,
+                        "section_number": c.section_number,
+                        "section_title": c.section_title,
                     }
                     for c in batch
                 ],

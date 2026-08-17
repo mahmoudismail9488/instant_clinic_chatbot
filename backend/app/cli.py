@@ -7,6 +7,7 @@ import sys
 import textwrap
 
 from backend.app.config import get_settings
+from backend.app.pipeline.evidence import format_location
 from backend.app.pipeline.run import build_index, run_query
 
 
@@ -41,7 +42,12 @@ def _print_query_result(result) -> None:
     else:
         for i, cite in enumerate(result.citations, start=1):
             excerpt = textwrap.shorten(cite.excerpt, width=280, placeholder=" …")
-            print(f"[{i}] score={cite.score:.3f}  source={cite.source}  chunk={cite.chunk_index}")
+            loc = format_location(cite.page, cite.section_number, cite.section_title)
+            loc_bit = f"  {loc}" if loc else ""
+            print(
+                f"[{i}] score={cite.score:.3f}  source={cite.source}  "
+                f"chunk={cite.chunk_index}{loc_bit}"
+            )
             print(f"    {excerpt}")
             print()
 
@@ -51,7 +57,12 @@ def _print_query_result(result) -> None:
         return
     for i, chunk in enumerate(result.chunks, start=1):
         excerpt = textwrap.shorten(chunk.text, width=360, placeholder=" …")
-        print(f"[{i}] score={chunk.score:.3f}  source={chunk.source}  chunk={chunk.chunk_index}")
+        loc = format_location(chunk.page, chunk.section_number, chunk.section_title)
+        loc_bit = f"  {loc}" if loc else ""
+        print(
+            f"[{i}] score={chunk.score:.3f}  source={chunk.source}  "
+            f"chunk={chunk.chunk_index}{loc_bit}"
+        )
         print(excerpt)
         print()
 

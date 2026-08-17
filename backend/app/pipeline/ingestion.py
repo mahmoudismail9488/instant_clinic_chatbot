@@ -1,9 +1,9 @@
-"""Stage 1 — load guideline files (PDF and .txt) into normalized text."""
+"""Stage 1 — load guideline files (PDF and .txt) into page-aware units."""
 
 from dataclasses import dataclass
 from pathlib import Path
 
-from backend.app.pipeline.source_loader import load_source_text
+from backend.app.pipeline.source_loader import PageUnit, load_source_units
 
 SUPPORTED_SUFFIXES = {".pdf", ".txt"}
 
@@ -12,7 +12,7 @@ SUPPORTED_SUFFIXES = {".pdf", ".txt"}
 class IngestedDocument:
     source: str
     source_path: Path
-    text: str
+    units: list[PageUnit]
 
 
 def list_guideline_files(directory: Path, *, txt_only: bool = False) -> list[Path]:
@@ -29,10 +29,10 @@ def list_guideline_files(directory: Path, *, txt_only: bool = False) -> list[Pat
 
 
 def ingest_file(path: Path) -> IngestedDocument:
-    text = load_source_text(path).strip()
-    if not text:
+    units = load_source_units(path)
+    if not units:
         raise ValueError(f"No extractable text in {path.name}")
-    return IngestedDocument(source=path.name, source_path=path, text=text)
+    return IngestedDocument(source=path.name, source_path=path, units=units)
 
 
 def ingest_directory(directory: Path, *, txt_only: bool = False) -> list[IngestedDocument]:

@@ -1,5 +1,6 @@
 """Stage 6 — generate an answer grounded in retrieved context."""
 
+from backend.app.pipeline.evidence import format_location
 from backend.app.pipeline.retrieval import RetrievedChunk
 from backend.app.services.llm_client import LLMClient
 
@@ -15,8 +16,11 @@ def generate_answer(
 
     blocks: list[str] = []
     for i, chunk in enumerate(contexts, start=1):
+        loc = format_location(chunk.page, chunk.section_number, chunk.section_title)
+        loc_bit = f", {loc}" if loc else ""
         blocks.append(
-            f"[{i}] source={chunk.source} (chunk {chunk.chunk_index}, score={chunk.score:.3f})\n"
+            f"[{i}] source={chunk.source} (chunk {chunk.chunk_index}, "
+            f"score={chunk.score:.3f}{loc_bit})\n"
             f"{chunk.text}"
         )
     context_block = "\n\n".join(blocks)
