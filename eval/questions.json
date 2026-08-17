@@ -1,0 +1,20 @@
+[
+  {"question_id": "Q01", "question": "Who should be screened for type 2 diabetes?"},
+  {"question_id": "Q02", "question": "At what age should routine type 2 diabetes screening begin in asymptomatic adults?"},
+  {"question_id": "Q03", "question": "What HbA1c threshold is used to diagnose diabetes?"},
+  {"question_id": "Q04", "question": "What fasting plasma glucose level indicates diabetes?"},
+  {"question_id": "Q05", "question": "When is an oral glucose tolerance test (OGTT) recommended for diagnosis?"},
+  {"question_id": "Q06", "question": "How is prediabetes defined using HbA1c or fasting glucose?"},
+  {"question_id": "Q07", "question": "Should a healthy 22-year-old without risk factors be routinely screened for type 2 diabetes?"},
+  {"question_id": "Q08", "question": "What risk factors warrant earlier diabetes screening in younger adults?"},
+  {"question_id": "Q09", "question": "How often should high-risk adults be rescreened for type 2 diabetes?"},
+  {"question_id": "Q10", "question": "Can HbA1c be used for diabetes screening and what limitations apply?"},
+  {"question_id": "Q11", "question": "What are USPSTF recommendations for screening for prediabetes and type 2 diabetes?"},
+  {"question_id": "Q12", "question": "How should diabetes be classified into type 1 versus type 2?"},
+  {"question_id": "Q13", "question": "What diagnostic criteria apply for gestational diabetes screening?"},
+  {"question_id": "Q14", "question": "Which laboratory tests are preferred for confirming a diabetes diagnosis?"},
+  {"question_id": "Q15", "question": "What lifestyle interventions are recommended for people with prediabetes?"},
+  {"question_id": "Q16", "question": "How should diabetes screening differ for people with overweight or obesity?"},
+  {"question_id": "Q17", "question": "What NICE guidance exists for preventing type 2 diabetes in high-risk individuals?"},
+  {"question_id": "Q18", "question": "How do diabetes screening recommendations differ across major guidelines?"}
+]

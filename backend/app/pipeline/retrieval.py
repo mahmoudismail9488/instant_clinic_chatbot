@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from backend.app.pipeline.chunking import infer_section_title
 from backend.app.services.llm_client import LLMClient
 from backend.app.services.vector_store import VectorStore
 
@@ -35,16 +36,19 @@ def retrieve(
         page = hit.get("page", meta.get("page"))
         section_number = hit.get("section_number", meta.get("section_number"))
         section_title = hit.get("section_title", meta.get("section_title"))
+        text = str(hit["text"])
         results.append(
             RetrievedChunk(
-                text=hit["text"],
+                text=text,
                 score=float(hit["score"]),
                 source=str(hit["source"]),
                 source_path=str(hit.get("source_path", "")),
                 chunk_index=int(hit.get("chunk_index", 0)),
                 page=int(page) if page is not None else None,
                 section_number=str(section_number) if section_number else None,
-                section_title=str(section_title) if section_title else None,
+                section_title=infer_section_title(
+                    text, str(section_title) if section_title else None
+                ),
             )
         )
     return results

@@ -9,11 +9,32 @@ from backend.app.pipeline.source_loader import PageUnit
 
 # Markdown: "# …", "## Prediabetes and Type 2 Diabetes"
 _MD_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
-# Dotted section numbers: "2.1 Screening…", "4.2.3 Title"
-_DOTTED_SECTION = re.compile(r"^((?:\d+\.)+\d+)\s+([A-Z].{2,140})$")
+# Dotted / NICE-style: "1.5 HbA1c measurement…", "2.1 Screening…"
+_DOTTED_SECTION = re.compile(r"^((?:\d+\.)+\d+)\s+([A-Za-z].{2,140})$")
 # Explicit labels: "Chapter 4 Screening…", "Section 3.2: Title"
 _SECTION_LABEL = re.compile(
     r"^(?:Section|CHAPTER|Chapter|Part)\s+(\d+[A-Za-z0-9.]*)(?:\s*[:.\-–—]\s*|\s+)(.+)$",
+    re.IGNORECASE,
+)
+# Known section titles (line-start or inline in dense PDF tables)
+_KNOWN_SECTION_TITLES = (
+    "Who to screen",
+    "How to screen",
+    "Screening of Type 2 Diabetes",
+    "Diagnosis of Diabetes",
+    "Diagnostic Tests for Diabetes",
+    "Prediabetes and Type 2 Diabetes",
+    "Classification",
+    "Key Messages",
+    "Recommendations",
+    "Full Text",
+)
+_SECTION_TITLE_ONLY = re.compile(
+    r"^(" + "|".join(re.escape(t) for t in _KNOWN_SECTION_TITLES) + r")\s*$",
+    re.IGNORECASE,
+)
+_INLINE_SECTION_TITLE = re.compile(
+    r"(" + "|".join(re.escape(t) for t in _KNOWN_SECTION_TITLES) + r")",
     re.IGNORECASE,
 )
 
@@ -43,7 +64,6 @@ def _parse_heading(line: str) -> _Section | None:
     md = _MD_HEADING.match(raw)
     if md:
         title = md.group(2).strip()
-        # "# 2. Diagnosis and Classification…"
         dotted = re.match(r"^((?:\d+\.)+\d*|\d+)\.?\s+(.+)$", title)
         if dotted:
             return _Section(number=dotted.group(1), title=dotted.group(2).strip())
@@ -57,7 +77,25 @@ def _parse_heading(line: str) -> _Section | None:
     if dotted and not raw.endswith(","):
         return _Section(number=dotted.group(1), title=dotted.group(2).strip())
 
+    titled = _SECTION_TITLE_ONLY.match(raw)
+    if titled:
+        return _Section(title=titled.group(1).strip())
+
     return None
+
+
+def infer_section_title(text: str, current: str | None = None) -> str | None:
+    """Fill section_title from known inline headings when line-based parse missed them."""
+    if current:
+        return current
+    matches = list(_INLINE_SECTION_TITLE.finditer(text or ""))
+    if not matches:
+        return None
+    raw = matches[0].group(1).strip()
+    for known in _KNOWN_SECTION_TITLES:
+        if known.lower() == raw.lower():
+            return known
+    return raw
 
 
 def chunk_units(
@@ -65,8 +103,8 @@ def chunk_units(
     *,
     source: str,
     source_path: str,
-    chunk_size: int = 1200,
-    overlap: int = 200,
+    chunk_size: int = 1024,
+    overlap: int = 100,
 ) -> list[Chunk]:
     """Chunk page-aware units, attaching the nearest section heading to each chunk."""
     if chunk_size <= 0:
@@ -98,7 +136,7 @@ def chunk_units(
                 source_path=source_path,
                 page=page,
                 section_number=sec.number,
-                section_title=sec.title,
+                section_title=infer_section_title(cleaned, sec.title),
             )
         )
         index += 1
@@ -157,8 +195,8 @@ def chunk_text(
     *,
     source: str,
     source_path: str,
-    chunk_size: int = 1200,
-    overlap: int = 200,
+    chunk_size: int = 1024,
+    overlap: int = 100,
 ) -> list[Chunk]:
     """Chunk flat text, honoring optional `[page N]` markers."""
     units: list[PageUnit] = []

@@ -8,7 +8,8 @@ import textwrap
 import traceback
 
 from backend.app.config import get_settings
-from backend.app.pipeline.evidence import format_location
+from backend.app.pipeline.chunking import infer_section_title
+from backend.app.pipeline.evidence import format_evidence_header
 from backend.app.pipeline.run import build_index, run_query
 
 
@@ -57,29 +58,17 @@ def _print_query_result(result) -> None:
     else:
         for i, cite in enumerate(result.citations, start=1):
             excerpt = textwrap.shorten(cite.excerpt, width=280, placeholder=" …")
-            loc = format_location(cite.page, cite.section_number, cite.section_title)
-            loc_bit = f"  {loc}" if loc else ""
-            _out(
-                f"[{i}] score={cite.score:.3f}  source={cite.source}  "
-                f"chunk={cite.chunk_index}{loc_bit}"
+            title = infer_section_title(cite.excerpt, cite.section_title)
+            header = format_evidence_header(
+                score=cite.score,
+                source=cite.source,
+                chunk_index=cite.chunk_index,
+                page=cite.page,
+                section_number=cite.section_number,
+                section_title=title,
             )
+            _out(f"[{i}] {header}")
             _out(f"    {excerpt}")
-            _out()
-
-    _out("=== Related chunks ===\n")
-    if not result.chunks:
-        _out("(none)")
-        return
-    for i, chunk in enumerate(result.chunks, start=1):
-        excerpt = textwrap.shorten(chunk.text, width=360, placeholder=" …")
-        loc = format_location(chunk.page, chunk.section_number, chunk.section_title)
-        loc_bit = f"  {loc}" if loc else ""
-        _out(
-            f"[{i}] score={chunk.score:.3f}  source={chunk.source}  "
-            f"chunk={chunk.chunk_index}{loc_bit}"
-        )
-        _out(excerpt)
-        _out()
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:

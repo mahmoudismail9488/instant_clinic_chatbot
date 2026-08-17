@@ -17,10 +17,11 @@ def generate_answer(
     blocks: list[str] = []
     for i, chunk in enumerate(contexts, start=1):
         loc = format_location(chunk.page, chunk.section_number, chunk.section_title)
+        sec = chunk.section_title or "—"
         loc_bit = f", {loc}" if loc else ""
         blocks.append(
             f"[{i}] source={chunk.source} (chunk {chunk.chunk_index}, "
-            f"score={chunk.score:.3f}{loc_bit})\n"
+            f"score={chunk.score:.3f}{loc_bit}, section_title={sec})\n"
             f"{chunk.text}"
         )
     context_block = "\n\n".join(blocks)
