@@ -189,10 +189,12 @@ poetry.toml
 data/index/
 data/uploads/*
 !data/uploads/.gitkeep
+data/raw_guidelines/*
 
 # ---------- Graphify ----------
 graphify/
 graphify_data/
 graphify-out/
 
-
+.cursor/
+.githooks/ 
