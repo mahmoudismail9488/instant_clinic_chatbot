@@ -5,89 +5,106 @@ from __future__ import annotations
 import argparse
 import sys
 import textwrap
+import traceback
 
 from backend.app.config import get_settings
 from backend.app.pipeline.evidence import format_location
 from backend.app.pipeline.run import build_index, run_query
 
 
+def _out(message: str = "") -> None:
+    """Write user-facing CLI output.
+
+    Some IDE terminals only reliably show stderr for this process, so we write
+    interactive results there (progress already used stderr successfully).
+    """
+    try:
+        print(message, file=sys.stderr, flush=True)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stderr, "encoding", None) or "utf-8"
+        sys.stderr.buffer.write((message + "\n").encode(encoding, errors="replace"))
+        sys.stderr.buffer.flush()
+
+
 def _print_query_result(result) -> None:
-    print("\n=== Query rewrite ===\n")
-    print(f"original : {result.original_query}")
-    print(f"rewritten: {result.rewritten_query}")
+    _out("\n=== Query rewrite ===\n")
+    _out(f"original : {result.original_query}")
+    _out(f"rewritten: {result.rewritten_query}")
 
     if result.blocked:
-        print("\n=== Guardrails ===\n")
+        _out("\n=== Guardrails ===\n")
         reason = result.guardrail.reason if result.guardrail else "blocked"
-        print(f"BLOCKED — {reason}")
-        print("\n=== Answer ===\n")
-        print(result.answer)
+        _out(f"BLOCKED — {reason}")
+        _out("\n=== Answer ===\n")
+        _out(result.answer)
         return
 
-    print("\n=== Answer ===\n")
-    print(result.answer)
+    _out("\n=== Answer ===\n")
+    _out(result.answer or "(empty answer from model)")
 
     if result.conflict is not None:
-        print("\n=== Conflict detection ===\n")
+        _out("\n=== Conflict detection ===\n")
         if result.conflict.has_conflict:
-            print(result.conflict.summary or "Conflict flagged")
+            _out(result.conflict.summary or "Conflict flagged")
             if result.conflict.sources:
-                print("sources:", ", ".join(result.conflict.sources))
+                _out("sources: " + ", ".join(result.conflict.sources))
         else:
-            print("No material conflict detected across retrieved sources.")
+            _out("No material conflict detected across retrieved sources.")
 
-    print("\n=== Evidence / citations ===\n")
+    _out("\n=== Evidence / citations ===\n")
     if not result.citations:
-        print("(none)")
+        _out("(none)")
     else:
         for i, cite in enumerate(result.citations, start=1):
             excerpt = textwrap.shorten(cite.excerpt, width=280, placeholder=" …")
             loc = format_location(cite.page, cite.section_number, cite.section_title)
             loc_bit = f"  {loc}" if loc else ""
-            print(
+            _out(
                 f"[{i}] score={cite.score:.3f}  source={cite.source}  "
                 f"chunk={cite.chunk_index}{loc_bit}"
             )
-            print(f"    {excerpt}")
-            print()
+            _out(f"    {excerpt}")
+            _out()
 
-    print("=== Related chunks ===\n")
+    _out("=== Related chunks ===\n")
     if not result.chunks:
-        print("(none)")
+        _out("(none)")
         return
     for i, chunk in enumerate(result.chunks, start=1):
         excerpt = textwrap.shorten(chunk.text, width=360, placeholder=" …")
         loc = format_location(chunk.page, chunk.section_number, chunk.section_title)
         loc_bit = f"  {loc}" if loc else ""
-        print(
+        _out(
             f"[{i}] score={chunk.score:.3f}  source={chunk.source}  "
             f"chunk={chunk.chunk_index}{loc_bit}"
         )
-        print(excerpt)
-        print()
+        _out(excerpt)
+        _out()
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:
     settings = get_settings()
-    print(f"Ingesting from: {settings.raw_guidelines_dir}")
+    _out(f"Ingesting from: {settings.raw_guidelines_dir}")
     if args.txt_only:
-        print("Mode: .txt files only")
+        _out("Mode: .txt files only")
     stats = build_index(txt_only=args.txt_only, rebuild=not args.append)
-    print(
+    _out(
         f"Done. documents={stats['documents']} chunks={stats['chunks']} "
         f"index_size={stats['index_size']}"
     )
-    print(f"Index path: {settings.vector_index_dir}")
+    _out(f"Index path: {settings.vector_index_dir}")
     return 0
 
 
 def cmd_query(args: argparse.Namespace) -> int:
     query = args.query.strip()
     if not query:
-        print("Query must be non-empty.", file=sys.stderr)
+        _out("Query must be non-empty.")
         return 2
-    result = run_query(query, top_k=args.top_k)
+    _out("Running pipeline (rewrite → retrieve → generate → conflict check)…")
+    result = run_query(query, top_k=args.top_k, progress=_out)
     _print_query_result(result)
+    _out("Done.")
     return 0 if not result.blocked else 1
 
 
@@ -120,9 +137,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+        sys.stderr.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
     parser = build_parser()
     args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except KeyboardInterrupt:
+        _out("Interrupted.")
+        return 130
+    except Exception as exc:
+        _out(f"Error: {exc}")
+        traceback.print_exc(file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

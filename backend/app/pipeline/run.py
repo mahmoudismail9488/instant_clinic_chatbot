@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -91,12 +92,17 @@ def run_query(
     *,
     top_k: int | None = None,
     settings: Settings | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> QueryResult:
     """
     Pipeline:
       guard(query) → rewrite → retrieve → generate → guard(answer)
       → conflict_detection → evidence
     """
+    def _progress(message: str) -> None:
+        if progress is not None:
+            progress(message)
+
     cfg = settings or get_settings()
     original = query.strip()
 
@@ -118,8 +124,11 @@ def run_query(
     client = LLMClient(cfg)
     k = top_k or cfg.default_top_k
 
+    _progress("1/4 Rewriting query…")
     rewritten = rewrite_query(original, client=client)
+    _progress("2/4 Retrieving guideline chunks…")
     chunks = retrieve(rewritten, top_k=k, store=store, client=client)
+    _progress(f"3/4 Generating answer from {len(chunks)} chunks…")
     answer = generate_answer(original, chunks, client=client)
 
     answer_guard = check_answer(answer)
@@ -134,6 +143,7 @@ def run_query(
             blocked=True,
         )
 
+    _progress("4/4 Checking for guideline conflicts…")
     conflict = detect_conflicts(chunks, client=client)
     if conflict.has_conflict and conflict.summary:
         answer = f"{answer}\n\n⚠ Guideline conflict note:\n{conflict.summary}"

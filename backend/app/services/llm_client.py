@@ -53,7 +53,13 @@ class LLMClient:
             ],
         )
         content = response.choices[0].message.content
-        return (content or "").strip()
+        if content and content.strip():
+            return content.strip()
+        # Some Groq reasoning models may leave content empty; fall back if present.
+        reasoning = getattr(response.choices[0].message, "reasoning", None)
+        if isinstance(reasoning, str) and reasoning.strip():
+            return reasoning.strip()
+        return ""
 
     def generate(self, *, query: str, context: str) -> str:
         system = (
