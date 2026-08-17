@@ -52,7 +52,7 @@ Uses `CHUNK_SIZE` / `CHUNK_OVERLAP` from `.env` (Config B by default). Each chun
 uv run clinic query "Who should be screened for type 2 diabetes?"
 ```
 
-Prints a grounded **answer** plus **related chunks** (score, document, page, section).
+Prints a grounded **answer** plus **related chunks** (score, document, page, `section_number`, `section_title`).
 
 ## Retrieval evaluation
 

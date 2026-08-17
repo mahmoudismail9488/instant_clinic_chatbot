@@ -26,10 +26,13 @@ class Settings(BaseSettings):
     raw_guidelines_dir: Path = REPO_ROOT / "data" / "raw_guidelines"
     vector_index_dir: Path = REPO_ROOT / "data" / "index"
 
-    chunk_size: int = 1200
-    chunk_overlap: int = 200
+    # Config B from fair 3-config lab on current corpus (old=1200/200, cfgA=512/50).
+    # Report: eval/outputs/LAB_REPORT.md
+    chunk_size: int = 1024
+    chunk_overlap: int = 100
     default_top_k: int = 5
     embed_batch_size: int = 64
+    active_chunk_config: str = "cfgB"
 
 
 @lru_cache
