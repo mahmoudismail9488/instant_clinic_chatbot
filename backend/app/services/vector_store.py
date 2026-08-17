@@ -113,6 +113,7 @@ class VectorStore:
         results: list[dict[str, Any]] = []
         for idx in top_idx:
             chunk = self._chunks[int(idx)]
+            meta = chunk.metadata or {}
             results.append(
                 {
                     "id": chunk.id,
@@ -121,7 +122,10 @@ class VectorStore:
                     "source": chunk.source,
                     "source_path": chunk.source_path,
                     "chunk_index": chunk.chunk_index,
-                    "metadata": chunk.metadata,
+                    "page": meta.get("page"),
+                    "section_number": meta.get("section_number"),
+                    "section_title": meta.get("section_title"),
+                    "metadata": meta,
                 }
             )
         return results
