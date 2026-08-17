@@ -187,8 +187,12 @@ poetry.toml
 # ---------- Data ----------
 # Keep seed guidelines; ignore generated vector index.
 data/index/
+data/qdrant_lab/
 data/uploads/*
 !data/uploads/.gitkeep
+eval/outputs/*.csv
+!eval/outputs/.gitkeep
+
 data/raw_guidelines/*
 
 # ---------- Graphify ----------
