@@ -1,8 +1,11 @@
-# CliniRAG retrieval evaluation lab
+# CliniRAG retrieval evaluation lab (Day 2)
 
 Scripts in `eval/` · artifacts in `eval/outputs/`.
 
-**Deliverable:** [`outputs/LAB_REPORT.md`](outputs/LAB_REPORT.md) — fair comparison of **old / cfgA / cfgB** on the current 2-PDF corpus, with Precision@3/@5, top-k tables, failure modes, labels, and the final config decision.
+**Day 2 deliverable:** [`outputs/LAB_REPORT.md`](outputs/LAB_REPORT.md) — fair comparison of **old / cfgA / cfgB** on the current 2-PDF corpus.
+
+**Day 3 (grounded answers / refusals / citations):** see [`../docs/day3/`](../docs/day3/).
+Production answers now use the grounded pipeline (`POST /query` / `clinic grounded`), built on the Config B index selected here.
 
 ## Chunk configs
 

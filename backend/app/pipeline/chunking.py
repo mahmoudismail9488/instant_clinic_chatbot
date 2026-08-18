@@ -141,7 +141,7 @@ def chunk_units(
         )
         index += 1
 
-    def flush(*, keep_overlap: bool) -> None:
+    def flush(*, keep_overlap: bool, next_page: int | None = None) -> None:
         nonlocal buffer, buffer_len, buffer_page, buffer_section
         if not buffer:
             return
@@ -151,6 +151,9 @@ def chunk_units(
             tail = text[-overlap:]
             buffer = [tail]
             buffer_len = len(tail)
+            # Critical: advance page for the continuing chunk. Leaving buffer_page stuck
+            # on the first page made most NICE citations point at early pages only.
+            buffer_page = next_page
         else:
             buffer = []
             buffer_len = 0
@@ -181,7 +184,7 @@ def chunk_units(
             buffer_len += len(stripped)
 
             if current_len() >= chunk_size:
-                flush(keep_overlap=True)
+                flush(keep_overlap=True, next_page=unit.page)
                 buffer_section = section
                 if buffer_page is None:
                     buffer_page = unit.page

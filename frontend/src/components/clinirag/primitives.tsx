@@ -60,7 +60,7 @@ export function CitationChip({
       )}
     >
       <Link2 className="size-3" strokeWidth={1.5} />
-      {citation.doc} · p.{citation.page} · {citation.section}
+      {citation.doc} · {citation.page ? `p.${citation.page}` : "p.n/a"} · {citation.section}
     </button>
   );
 }

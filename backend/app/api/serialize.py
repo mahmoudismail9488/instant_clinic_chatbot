@@ -1,4 +1,4 @@
-"""Map pipeline QueryResult → API / frontend-friendly response."""
+"""Map grounded Day-3 pipeline results → API / frontend response."""
 
 from __future__ import annotations
 
@@ -7,162 +7,148 @@ import uuid
 from backend.app.models.schemas import (
     ChunkOut,
     CitationOut,
-    ConflictOut,
     GuardrailOut,
     QueryResponse,
 )
+from backend.app.pipeline.answer_schema import (
+    AnswerStatus,
+    ConfidenceLevel,
+    chunk_ref,
+    store_id,
+)
 from backend.app.pipeline.evidence import format_location
-from backend.app.pipeline.run import QueryResult
+from backend.app.pipeline.grounded_run import GroundedResult
+from backend.app.pipeline.retrieval import RetrievedChunk
 
 
 def _section(number: str | None, title: str | None) -> str:
     return format_location(None, number, title) or (title or number or "")
 
-# Owner of search must change this
-def _confidence(scores: list[float], *, blocked: bool, empty: bool) -> str:
-    if blocked or empty:
-        return "insufficient"
-    if not scores:
-        return "insufficient"
-    top = max(scores)
-    # Cosine scores vary by embedding stack; keep a soft ladder and avoid
-    # marking successful retrievals as "insufficient" solely due to scale.
-    if top >= 0.7:
-        return "high"
-    if top >= 0.45:
-        return "medium"
-    if top >= 0.2:
-        return "low"
-    return "low"
 
-
-def _refusal_reason(guard_reason: str | None) -> str:
-    text = (guard_reason or "").lower()
-    if "emergency" in text or "chest pain" in text or "overdose" in text:
-        return "Emergency — seek immediate care"
-    if "empty" in text or "blocked" in text:
-        return "Out of scope"
-    return "Out of scope"
-
-
-def query_result_to_response(result: QueryResult) -> QueryResponse:
-    turn_id = f"t-{uuid.uuid4().hex[:10]}"
-    cited_ids = {
-        f"{c.source}::{c.chunk_index}" for c in result.citations
+def _ui_confidence(level: ConfidenceLevel) -> str:
+    mapping = {
+        ConfidenceLevel.HIGH: "high",
+        ConfidenceLevel.MEDIUM: "medium",
+        ConfidenceLevel.LOW: "low",
+        ConfidenceLevel.INSUFFICIENT: "insufficient",
     }
+    return mapping.get(level, "medium")
 
-    chunks_out: list[ChunkOut] = []
-    for ch in result.chunks:
-        cid = f"{ch.source}::{ch.chunk_index}"
-        section = _section(ch.section_number, ch.section_title)
-        chunks_out.append(
-            ChunkOut(
-                id=cid,
-                doc=ch.source,
-                page=ch.page,
-                section=section,
-                section_number=ch.section_number,
-                section_title=ch.section_title,
-                score=round(ch.score, 4),
-                excerpt=(ch.text[:280] + "…") if len(ch.text) > 280 else ch.text,
-                text=ch.text,
-                used=cid in cited_ids if cited_ids else True,
+
+def _refusal_reason(result: GroundedResult) -> str:
+    if result.answer.status is AnswerStatus.SAFETY_REFUSAL:
+        return "Patient-specific — seek clinical care"
+    if result.safety and result.safety.patient_specific:
+        return "Patient-specific — seek clinical care"
+    return "Insufficient retrieval confidence"
+
+
+def _chunk_out(ch: RetrievedChunk, *, used: bool) -> ChunkOut:
+    section = _section(ch.section_number, ch.section_title)
+    return ChunkOut(
+        id=store_id(ch),
+        doc=ch.source,
+        page=ch.page,
+        section=section,
+        section_number=ch.section_number,
+        section_title=ch.section_title,
+        score=round(ch.score, 4),
+        excerpt=(ch.text[:280] + "…") if len(ch.text) > 280 else ch.text,
+        text=ch.text,
+        used=used,
+    )
+
+
+def grounded_result_to_response(result: GroundedResult) -> QueryResponse:
+    turn_id = f"t-{uuid.uuid4().hex[:10]}"
+    answer = result.answer
+
+    used_ids = {store_id(c) for c in result.used}
+    # Prefer used chunks for the evidence panel; fall back to retrieved.
+    source_chunks = result.used or result.retrieved
+    chunks_out = [_chunk_out(c, used=(store_id(c) in used_ids or not used_ids)) for c in source_chunks]
+
+    by_ref = {chunk_ref(c).upper(): c for c in source_chunks}
+    citations_out: list[CitationOut] = []
+    evidence: list[dict] = []
+
+    for item in answer.supporting_evidence:
+        for citation in item.citations:
+            ref = citation.chunk.strip().upper()
+            chunk = by_ref.get(ref)
+            page = citation.page if citation.page is not None else (chunk.page if chunk else None)
+            section = citation.section or (
+                _section(chunk.section_number, chunk.section_title) if chunk else "—"
             )
-        )
+            chunk_id = store_id(chunk) if chunk else f"{citation.document}::{citation.chunk}"
+            citations_out.append(
+                CitationOut(
+                    doc=citation.document,
+                    page=page,
+                    section=section or "—",
+                    chunk_id=chunk_id,
+                    excerpt=item.claim,
+                    score=round(chunk.score, 4) if chunk else 0.0,
+                )
+            )
+            evidence.append(
+                {
+                    "text": item.claim,
+                    "citation": {
+                        "doc": citation.document,
+                        "page": page or 0,
+                        "section": section or "—",
+                        "chunkId": chunk_id,
+                    },
+                }
+            )
 
-    citations_out = [
-        CitationOut(
-            doc=c.source,
-            page=c.page,
-            section=_section(c.section_number, c.section_title),
-            chunk_id=f"{c.source}::{c.chunk_index}",
-            excerpt=c.excerpt,
-            score=round(c.score, 4),
-        )
-        for c in result.citations
-    ]
+    # Mark cited chunks as used in the panel.
+    cited = {c.chunk_id for c in citations_out}
+    for ch in chunks_out:
+        if cited:
+            ch.used = ch.id in cited
 
-    evidence = [
-        {
-            "text": c.excerpt,
-            "citation": {
-                "doc": c.doc,
-                "page": c.page or 0,
-                "section": c.section or "—",
-                "chunkId": c.chunk_id,
-            },
-        }
-        for c in citations_out
-    ]
+    guard = None
+    if result.safety and result.safety.patient_specific:
+        guard = GuardrailOut(allowed=False, reason=result.safety.reason)
+    elif answer.status is not AnswerStatus.ANSWERED:
+        guard = GuardrailOut(allowed=False, reason=answer.status.value)
 
-    scores = [c.score for c in result.chunks]
-    confidence = _confidence(scores, blocked=result.blocked, empty=not result.chunks)
-    guard = (
-        GuardrailOut(allowed=result.guardrail.allowed, reason=result.guardrail.reason)
-        if result.guardrail
-        else None
-    )
-    conflict = (
-        ConflictOut(
-            has_conflict=result.conflict.has_conflict,
-            summary=result.conflict.summary,
-            sources=list(result.conflict.sources),
-        )
-        if result.conflict
-        else None
-    )
-
-    if result.blocked:
-        reason = _refusal_reason(result.guardrail.reason if result.guardrail else None)
+    if answer.status is not AnswerStatus.ANSWERED:
         return QueryResponse(
             kind="refusal",
             id=turn_id,
-            question=result.original_query,
-            rewritten_query=result.rewritten_query,
-            detail=result.answer,
-            reason=reason,
-            confidence="insufficient",
+            question=result.question,
+            recommendation=answer.recommendation,
+            detail=answer.recommendation,
+            reason=_refusal_reason(result),
+            confidence=_ui_confidence(answer.confidence),
+            evidence=evidence,
             chunks=chunks_out,
             citations=citations_out,
-            evidence=evidence,
-            conflict=conflict,
             guardrail=guard,
             blocked=True,
+            status=answer.status.value,
+            safety_note=answer.safety_note,
+            missing_information=list(answer.missing_information),
+            decision_path=list(result.decision_path),
         )
-
-    if not result.chunks:
-        return QueryResponse(
-            kind="refusal",
-            id=turn_id,
-            question=result.original_query,
-            rewritten_query=result.rewritten_query,
-            detail="No guideline chunks were retrieved for this question.",
-            reason="Insufficient retrieval confidence",
-            confidence="insufficient",
-            chunks=[],
-            citations=[],
-            evidence=[],
-            conflict=conflict,
-            guardrail=guard,
-            blocked=True,
-        )
-
-    caution = None
-    if conflict and conflict.has_conflict:
-        caution = conflict.summary or "Guideline sources may conflict — review evidence carefully."
 
     return QueryResponse(
         kind="answer",
         id=turn_id,
-        question=result.original_query,
-        rewritten_query=result.rewritten_query,
-        recommendation=result.answer,
-        caution=caution,
-        confidence=confidence,
+        question=result.question,
+        recommendation=answer.recommendation,
+        caution=None,
+        confidence=_ui_confidence(answer.confidence),
         evidence=evidence,
         chunks=chunks_out,
         citations=citations_out,
-        conflict=conflict,
-        guardrail=guard,
+        guardrail=GuardrailOut(allowed=True, reason=None),
         blocked=False,
+        status=answer.status.value,
+        safety_note=answer.safety_note,
+        missing_information=list(answer.missing_information),
+        decision_path=list(result.decision_path),
     )

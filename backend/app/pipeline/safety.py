@@ -45,14 +45,16 @@ _PERSONAL_DIAGNOSIS = re.compile(
     re.IGNORECASE,
 )
 
-# Dosage: asking how much of something to take.
+# Dosage: asking how much of something to take (self or patient).
 _DOSAGE = re.compile(
     r"\bwhat\s+dose\b"
     r"|\bwhat\s+dosage\b"
     r"|\bhow\s+(?:much|many)\s+(?:should|do)\s+i\s+take\b"
     r"|\bhow\s+many\s+mg\b"
     r"|\b(?:prescribe|prescription)\s+(?:me|for\s+me)\b"
-    r"|\bshould\s+i\s+(?:start|stop|take|increase|reduce)\s+\w+",
+    r"|\bshould\s+i\s+(?:start|stop|take|increase|reduce)\s+\w+"
+    r"|\b(?:dose|dosage)\s+(?:for|of)\s+(?:my\s+)?(?:patient|client)\b"
+    r"|\bwhat\s+dose\s+should\s+(?:my\s+)?(?:patient|client)\b",
     re.IGNORECASE,
 )
 
@@ -61,7 +63,8 @@ _PERSONAL_TREATMENT = re.compile(
     r"\bwhich\s+(?:treatment|medication|drug|therapy)\s+should\s+i\b"
     r"|\bwhat\s+should\s+i\s+(?:do|take)\b"
     r"|\bwhat\s+treatment\s+(?:is\s+best\s+)?for\s+me\b"
-    r"|\btreat\s+me\b",
+    r"|\btreat\s+me\b"
+    r"|\bwhich\s+(?:treatment|medication|drug|therapy)\s+should\s+(?:my\s+)?(?:patient|client)\b",
     re.IGNORECASE,
 )
 

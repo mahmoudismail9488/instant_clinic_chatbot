@@ -151,6 +151,8 @@ def test_refusal_helper_is_always_valid():
         "Are my results normal?",
         "I'm 45 years old with a BMI of 32, should I be screened?",
         "Please prescribe me something.",
+        "What dose should my patient take?",
+        "Which treatment should my patient choose?",
     ],
 )
 def test_patient_specific_questions_are_refused(question):

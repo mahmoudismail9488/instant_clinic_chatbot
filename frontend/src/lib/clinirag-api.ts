@@ -1,4 +1,4 @@
-/** Client for the CliniRAG FastAPI backend. */
+/** Client for the CliniRAG FastAPI backend (Day 3 grounded pipeline). */
 
 import type {
   AnswerTurn,
@@ -8,7 +8,7 @@ import type {
   Turn,
 } from "@/lib/clinirag-data";
 
-const DEFAULT_API = "http://127.0.0.1:8000";
+const DEFAULT_API = "http://localhost:8000";
 
 export function apiBaseUrl(): string {
   return (import.meta.env["VITE_API_URL"] as string | undefined)?.replace(/\/$/, "") || DEFAULT_API;
@@ -30,15 +30,20 @@ type ApiResponse = {
   kind: "answer" | "refusal" | string;
   id: string;
   question: string;
-  rewritten_query?: string;
   recommendation?: string;
   detail?: string;
   reason?: string | null;
   caution?: string | null;
   confidence?: string;
-  evidence?: { text: string; citation: { doc: string; page: number; section: string; chunkId: string } }[];
+  evidence?: {
+    text: string;
+    citation: { doc: string; page: number; section: string; chunkId: string };
+  }[];
   chunks?: ApiChunk[];
   blocked?: boolean;
+  status?: string;
+  safety_note?: string | null;
+  missing_information?: string[];
 };
 
 function mapChunks(chunks: ApiChunk[] | undefined): EvidenceChunk[] {
@@ -55,29 +60,41 @@ function mapChunks(chunks: ApiChunk[] | undefined): EvidenceChunk[] {
 }
 
 function mapConfidence(value: string | undefined): Confidence {
-  if (value === "high" || value === "medium" || value === "low" || value === "insufficient") {
-    return value;
-  }
+  const v = (value || "").toLowerCase();
+  if (v === "high") return "high";
+  if (v === "medium") return "medium";
+  if (v === "low") return "low";
+  if (v.includes("insufficient")) return "insufficient";
   return "medium";
 }
 
-function mapRefusalReason(
-  reason: string | null | undefined,
-): RefusalTurn["reason"] {
+function mapRefusalReason(reason: string | null | undefined): RefusalTurn["reason"] {
   if (reason === "Emergency — seek immediate care") return reason;
   if (reason === "Insufficient retrieval confidence") return reason;
+  if (reason === "Patient-specific — seek clinical care") return reason;
+  if ((reason || "").toLowerCase().includes("patient")) {
+    return "Patient-specific — seek clinical care";
+  }
   return "Out of scope";
 }
 
 export function mapApiToTurn(data: ApiResponse): Turn {
   const chunks = mapChunks(data.chunks);
   if (data.kind === "refusal" || data.blocked) {
+    const detailParts = [
+      data.detail || data.recommendation || "Request could not be answered from guidelines.",
+    ];
+    if (data.missing_information?.length) {
+      detailParts.push(data.missing_information.map((g) => `• ${g}`).join("\n"));
+    }
+    if (data.safety_note) detailParts.push(data.safety_note);
+
     return {
       kind: "refusal",
       id: data.id,
       question: data.question,
       reason: mapRefusalReason(data.reason),
-      detail: data.detail || data.recommendation || "Request could not be answered from guidelines.",
+      detail: detailParts.join("\n\n"),
       emergencyLine:
         data.reason === "Emergency — seek immediate care"
           ? "Call emergency services immediately (112 / 911 / local equivalent)."
@@ -90,7 +107,7 @@ export function mapApiToTurn(data: ApiResponse): Turn {
     kind: "answer",
     id: data.id,
     question: data.question,
-    caution: data.caution ?? undefined,
+    caution: data.caution ?? data.safety_note ?? undefined,
     recommendation: data.recommendation || "",
     evidence: (data.evidence ?? []).map((e) => ({
       text: e.text,
@@ -125,7 +142,7 @@ export async function queryGuidelines(
     let detail = res.statusText;
     try {
       const err = (await res.json()) as { detail?: string };
-      if (err.detail) detail = err.detail;
+      if (err.detail) detail = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
     } catch {
       /* ignore */
     }
@@ -136,8 +153,12 @@ export async function queryGuidelines(
   return mapApiToTurn(data);
 }
 
-export async function checkApiHealth(): Promise<{ status: string; index_size: number }> {
+export async function checkApiHealth(): Promise<{
+  status: string;
+  index_size: number;
+  pipeline?: string;
+}> {
   const res = await fetch(`${apiBaseUrl()}/health`);
   if (!res.ok) throw new Error(`Health check failed (${res.status})`);
-  return res.json() as Promise<{ status: string; index_size: number }>;
+  return res.json() as Promise<{ status: string; index_size: number; pipeline?: string }>;
 }

@@ -59,7 +59,11 @@ export type RefusalTurn = {
   kind: "refusal";
   id: string;
   question: string;
-  reason: "Out of scope" | "Emergency — seek immediate care" | "Insufficient retrieval confidence";
+  reason:
+    | "Out of scope"
+    | "Emergency — seek immediate care"
+    | "Insufficient retrieval confidence"
+    | "Patient-specific — seek clinical care";
   detail: string;
   emergencyLine?: string;
   chunks: EvidenceChunk[];
