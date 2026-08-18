@@ -54,6 +54,19 @@ uv run clinic query "Who should be screened for type 2 diabetes?"
 
 Prints a grounded **answer** plus **related chunks** (score, document, page, `section_number`, `section_title`).
 
+## Frontend
+
+UI lives in `frontend/` (from [cheerful-digital-garden](https://github.com/ahmed-nagah-r/cheerful-digital-garden)):
+
+```bash
+cd frontend
+cp .env.example .env   # add Supabase keys if using auth
+npm install
+npm run dev
+```
+
+See [`frontend/README.md`](frontend/README.md).
+
 ## Retrieval evaluation
 
 Lab scripts and checklist results live under `eval/`:
@@ -83,6 +96,7 @@ Details: [`eval/README.md`](eval/README.md) · full report: [`eval/outputs/LAB_R
 
 ```
 backend/app/          CLI + RAG pipeline + config
+frontend/             Vite / TanStack UI (cheerful-digital-garden)
 data/raw_guidelines/  source PDFs
 data/index/           production numpy index
 data/qdrant_lab/      isolated eval collections
