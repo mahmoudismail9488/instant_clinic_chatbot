@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronDown, LayoutDashboard, SendHorizontal } from "lucide-react";
+import { ChevronDown, LayoutDashboard, Loader2, SendHorizontal } from "lucide-react";
 import { AnswerCard, RefusalCard, UserMessage } from "@/components/clinirag/AnswerCard";
 import { EvidencePanel } from "@/components/clinirag/EvidencePanel";
 import { GuardrailIndicator } from "@/components/clinirag/primitives";
-import { demoTurns, pipelineStages, topics } from "@/lib/clinirag-data";
+import { pipelineStages, topics, type Turn } from "@/lib/clinirag-data";
+import { apiBaseUrl, queryGuidelines } from "@/lib/clinirag-api";
 import { SignOutButton } from "@/components/clinirag/SignOutButton";
 import { ThemeToggle } from "@/components/clinirag/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -34,15 +35,22 @@ export const Route = createFileRoute("/_authenticated/workspace")({
 
 function Workspace() {
   const { topic } = Route.useSearch();
-  const scope = topics.find((t) => t.id === topic) ?? topics[0]!;
-  const [visible, setVisible] = useState(1);
+  const scope = topics.find((t) => t.id === topic) ?? topics.find((t) => t.id === "diabetes") ?? topics[0]!;
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [activeChunk, setActiveChunk] = useState<string | null>(null);
   const [pipelineOpen, setPipelineOpen] = useState(true);
   const [draft, setDraft] = useState("");
   const [mobileTab, setMobileTab] = useState<"chat" | "evidence">("chat");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  const turns = demoTurns.slice(0, visible);
-  const current = turns[turns.length - 1]!;
+  const current = turns[turns.length - 1];
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [turns, loading]);
 
   function onCitation(chunkId: string) {
     setActiveChunk(chunkId);
@@ -52,10 +60,39 @@ function Workspace() {
     });
   }
 
-  function send() {
+  async function send() {
+    const question = draft.trim();
+    if (!question || loading) return;
+
     setDraft("");
+    setError(null);
     setActiveChunk(null);
-    setVisible((v) => Math.min(v + 1, demoTurns.length));
+    setLoading(true);
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    try {
+      const turn = await queryGuidelines(question, {
+        topic: scope.id,
+        signal: ac.signal,
+      });
+      setTurns((prev) => [...prev, turn]);
+      if (turn.chunks[0]) setActiveChunk(turn.chunks[0].id);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Request failed";
+      setError(
+        message.includes("Failed to fetch")
+          ? `Cannot reach API at ${apiBaseUrl()}. Start it with: uv run clinic-api`
+          : message,
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -99,6 +136,7 @@ function Workspace() {
                 {s.name} <span className="text-confidence-high">✓</span>
               </span>
             ))}
+            <span className="text-muted-foreground/80">API {apiBaseUrl()}</span>
           </div>
         )}
       </div>
@@ -126,7 +164,13 @@ function Workspace() {
             mobileTab === "chat" ? "flex" : "hidden",
           )}
         >
-          <div className="flex-1 space-y-5 overflow-y-auto p-4">
+          <div ref={listRef} className="flex-1 space-y-5 overflow-y-auto p-4">
+            {turns.length === 0 && !loading && (
+              <p className="rounded-lg border border-dashed border-border bg-card px-4 py-6 text-center text-[14px] text-muted-foreground">
+                Ask a guideline question grounded in the indexed corpus (Diabetes Canada CPG + NICE NG28).
+                Example: “Who should be screened for type 2 diabetes?”
+              </p>
+            )}
             {turns.map((turn) => (
               <div key={turn.id} className="space-y-3">
                 <UserMessage text={turn.question} />
@@ -137,34 +181,46 @@ function Workspace() {
                 )}
               </div>
             ))}
+            {loading && (
+              <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Retrieving guidelines and generating answer…
+              </div>
+            )}
+            {error && (
+              <p className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">
+                {error}
+              </p>
+            )}
           </div>
           <div className="border-t border-border bg-card p-3">
             <div className="flex items-center gap-2">
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && send()}
-                placeholder={
-                  visible < demoTurns.length
-                    ? "Ask a guideline question…"
-                    : "Demo session complete — reload to restart"
-                }
-                className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-[15px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+                onKeyDown={(e) => e.key === "Enter" && void send()}
+                placeholder="Ask a guideline question…"
+                disabled={loading}
+                className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-[15px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary disabled:opacity-60"
               />
               <button
                 type="button"
-                onClick={send}
-                disabled={visible >= demoTurns.length}
+                onClick={() => void send()}
+                disabled={loading || !draft.trim()}
                 className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[14px] font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover disabled:opacity-40"
               >
-                <SendHorizontal className="size-4" strokeWidth={1.5} />
+                {loading ? (
+                  <Loader2 className="size-4 animate-spin" strokeWidth={1.5} />
+                ) : (
+                  <SendHorizontal className="size-4" strokeWidth={1.5} />
+                )}
                 Send
               </button>
             </div>
             <div className="mt-2 flex items-center justify-between">
               <GuardrailIndicator />
               <span className="font-mono text-[12px] text-muted-foreground">
-                Scope locked · {scope.sources.length} source documents
+                Live RAG · {scope.title}
               </span>
             </div>
           </div>
@@ -176,7 +232,7 @@ function Workspace() {
             mobileTab === "evidence" ? "block flex-1" : "hidden",
           )}
         >
-          <EvidencePanel chunks={current.chunks} activeChunk={activeChunk} judgeMode />
+          <EvidencePanel chunks={current?.chunks ?? []} activeChunk={activeChunk} judgeMode />
         </aside>
       </div>
     </div>
