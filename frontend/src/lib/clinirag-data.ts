@@ -9,16 +9,19 @@ export type Topic = {
 
 export const topics: Topic[] = [
   {
+    id: "diabetes",
+    title: "Diabetes Screening",
+    blurb: "Screening age, risk factors, A1C and FPG cut-points (Diabetes Canada + NICE NG28).",
+    sources: [
+      "Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf",
+      "NICE-NG28-Type2-Diabetes-Adults-Recommendations.pdf",
+    ],
+  },
+  {
     id: "hypertension",
     title: "Adult Hypertension",
     blurb: "Diagnosis thresholds, first-line therapy, monitoring intervals.",
     sources: ["WHO HTN Guideline 2021", "CDC Hypertension Facts", "NICE NG136"],
-  },
-  {
-    id: "diabetes",
-    title: "Diabetes Screening",
-    blurb: "Screening age, risk factors, A1C and FPG cut-points.",
-    sources: ["USPSTF Prediabetes & T2DM 2021", "CDC Diabetes Report 2024", "NICE NG28"],
   },
   {
     id: "asthma",
@@ -212,13 +215,13 @@ export const demoTurns: Turn[] = [
 ];
 
 export const pipelineStages = [
-  { name: "Ingestion", metric: "4 source PDFs · 612 pages parsed" },
-  { name: "Chunking", metric: "1,284 chunks · 400–800 tokens · 12% overlap" },
-  { name: "Embeddings", metric: "1,284 vectors · 1536-dim · cosine index" },
-  { name: "Retrieval", metric: "Top-K = 5 · mean latency 240 ms" },
-  { name: "Guardrails", metric: "3 classes · 128 queries classified" },
-  { name: "Grounded LLM", metric: "Citation-constrained decoding · temp 0.2" },
-  { name: "Evidence Panel", metric: "100% of claims chunk-linked" },
+  { name: "Ingestion", metric: "2 PDFs · Diabetes Canada + NICE NG28" },
+  { name: "Chunking", metric: "Config B · 1024 tokens · overlap 100" },
+  { name: "Embeddings", metric: "BAAI/bge-small-en-v1.5 · cosine" },
+  { name: "Retrieval", metric: "Dense top-k=5 · numpy index" },
+  { name: "Guardrails", metric: "Query + answer safety checks" },
+  { name: "Grounded LLM", metric: "Groq chat · citation-constrained" },
+  { name: "Evidence Panel", metric: "Chunks with page + section_title" },
 ];
 
 export const evalRows = [
