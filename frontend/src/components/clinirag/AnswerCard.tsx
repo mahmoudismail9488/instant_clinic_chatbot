@@ -31,9 +31,8 @@ export function AnswerCard({
         <h3 className="font-mono text-[12px] uppercase tracking-wide text-muted-foreground">Recommendation</h3>
         <ConfidenceBadge level={turn.confidence} />
       </div>
-      <p className="px-4 pt-2 text-[15px] leading-[1.6] text-foreground">
-        <span className="font-semibold">{turn.recommendation.split(". ")[0]}.</span>{" "}
-        {turn.recommendation.split(". ").slice(1).join(". ")}
+      <p className="whitespace-pre-wrap px-4 pt-2 text-[15px] leading-[1.6] text-foreground">
+        {turn.recommendation}
       </p>
 
       <h3 className="px-4 pt-5 font-mono text-[12px] uppercase tracking-wide text-muted-foreground">

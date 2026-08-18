@@ -1,6 +1,6 @@
-# Instant Clinic — CLI RAG demo
+# Instant Clinic — CLI + web RAG
 
-Query diabetes screening guidelines from `data/raw_guidelines` via the terminal.
+Guideline-grounded diabetes screening assistant: **CLI**, **HTTP API**, and **Vite frontend**.
 
 | | |
 |---|---|
@@ -8,83 +8,64 @@ Query diabetes screening guidelines from `data/raw_guidelines` via the terminal.
 | **Embeddings** | local `fastembed` (`BAAI/bge-small-en-v1.5`) |
 | **Chunking** | **Config B** — `chunk_size=1024`, `overlap=100` |
 | **Index** | numpy cosine store under `data/index/` |
+| **API** | FastAPI `POST /query` · `GET /health` |
 | **Eval report** | [`eval/outputs/LAB_REPORT.md`](eval/outputs/LAB_REPORT.md) |
-
-Old production defaults were `1200` / `200`. Fair bake-off on the current corpus chose Config B (best Precision@3 and Precision@5 vs old and cfgA).
 
 ## Setup
 
-1. Copy env and set your key:
-
 ```bash
-cp backend/app/.env.example backend/app/.env
-# edit GROQ_API_KEY
-```
-
-2. Install:
-
-```bash
+cp backend/app/.env.example backend/app/.env   # set GROQ_API_KEY
 uv sync
-```
-
-## Corpus
-
-Active ingest files in `data/raw_guidelines/`:
-
-- `Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf`
-- `NICE-NG28-Type2-Diabetes-Adults-Recommendations.pdf`
-
-See [`data/raw_guidelines/SOURCES.md`](data/raw_guidelines/SOURCES.md) and [`CITATIONS.md`](data/raw_guidelines/CITATIONS.md).
-
-## Ingest
-
-Rebuild the vector index after changing chunk settings or corpus files:
-
-```bash
 uv run clinic ingest
 ```
 
-Uses `CHUNK_SIZE` / `CHUNK_OVERLAP` from `.env` (Config B by default). Each chunk stores `page`, `section_number`, and `section_title` when detected.
+## Run (full stack)
 
-## Query
+Terminal 1 — API:
+
+```bash
+uv run clinic-api
+# → http://127.0.0.1:8000  (docs at /docs)
+```
+
+Terminal 2 — frontend:
+
+```bash
+cd frontend
+cp .env.example .env   # set Supabase + VITE_API_URL=http://127.0.0.1:8000
+npm install
+npm run dev
+```
+
+Open the app, sign in, start a **Diabetes Screening** session, and ask a question. The workspace calls `POST /query` and shows answer + evidence chunks.
+
+### API smoke test
+
+```bash
+curl -s http://127.0.0.1:8000/health | jq
+curl -s -X POST http://127.0.0.1:8000/query \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"Who should be screened for type 2 diabetes?"}' | jq '.kind,.confidence,.chunks[0].section_title'
+```
+
+## CLI query
 
 ```bash
 uv run clinic query "Who should be screened for type 2 diabetes?"
 ```
 
-Prints a grounded **answer** plus **related chunks** (score, document, page, `section_number`, `section_title`).
+## Corpus
 
-## Frontend
+Active files in `data/raw_guidelines/`:
 
-UI lives in `frontend/` (from [cheerful-digital-garden](https://github.com/ahmed-nagah-r/cheerful-digital-garden)):
+- `Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf`
+- `NICE-NG28-Type2-Diabetes-Adults-Recommendations.pdf`
 
-```bash
-cd frontend
-cp .env.example .env   # add Supabase keys if using auth
-npm install
-npm run dev
-```
-
-See [`frontend/README.md`](frontend/README.md).
+See [`data/raw_guidelines/SOURCES.md`](data/raw_guidelines/SOURCES.md).
 
 ## Retrieval evaluation
 
-Lab scripts and checklist results live under `eval/`:
-
-```bash
-# Re-index + retrieve old / cfgA / cfgB on the current corpus
-uv run python -m eval.reindex_and_retrieve --config all --recreate --yes
-
-# Precision@3 / @5 (needs labels in eval/outputs/relevance_labels.csv)
-uv run python -m eval.compute_metrics \
-  --retrieval eval/outputs/retrieval_results_old.csv \
-  --retrieval eval/outputs/retrieval_results_cfgA.csv \
-  --retrieval eval/outputs/retrieval_results_cfgB.csv
-```
-
-Details: [`eval/README.md`](eval/README.md) · full report: [`eval/outputs/LAB_REPORT.md`](eval/outputs/LAB_REPORT.md)
-
-### Selected config (from lab)
+See [`eval/README.md`](eval/README.md) · report: [`eval/outputs/LAB_REPORT.md`](eval/outputs/LAB_REPORT.md)
 
 | config | size | overlap | avg P@3 | avg P@5 |
 |---|---:|---:|---:|---:|
@@ -95,10 +76,9 @@ Details: [`eval/README.md`](eval/README.md) · full report: [`eval/outputs/LAB_R
 ## Layout
 
 ```
-backend/app/          CLI + RAG pipeline + config
-frontend/             Vite / TanStack UI (cheerful-digital-garden)
+backend/app/          CLI + FastAPI + RAG pipeline
+frontend/             Vite / TanStack UI
 data/raw_guidelines/  source PDFs
 data/index/           production numpy index
-data/qdrant_lab/      isolated eval collections
-eval/                 retrieval lab scripts + outputs
+eval/                 retrieval lab
 ```

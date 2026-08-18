@@ -26,13 +26,21 @@ class Settings(BaseSettings):
     raw_guidelines_dir: Path = REPO_ROOT / "data" / "raw_guidelines"
     vector_index_dir: Path = REPO_ROOT / "data" / "index"
 
-    # Config B from fair 3-config lab on current corpus (old=1200/200, cfgA=512/50).
-    # Report: eval/outputs/LAB_REPORT.md
     chunk_size: int = 1024
     chunk_overlap: int = 100
     default_top_k: int = 5
     embed_batch_size: int = 64
     active_chunk_config: str = "cfgB"
+
+    # HTTP API (frontend integration)
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    # Vite often binds 5173 or 8080; comma-separated allow-list.
+    cors_origins: str = (
+        "http://localhost:8080,http://127.0.0.1:8080,"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:3000,http://127.0.0.1:3000"
+    )
 
 
 @lru_cache
