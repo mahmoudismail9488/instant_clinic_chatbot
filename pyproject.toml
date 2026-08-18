@@ -18,6 +18,8 @@ dependencies = [
     "qdrant-client>=1.19.0",
     "rank-bm25>=0.2.2",
     "sentence-transformers>=5.7.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +29,7 @@ dev = [
 
 [project.scripts]
 clinic = "backend.app.cli:main"
+clinic-api = "backend.app.api.app:main"
 
 [build-system]
 requires = ["hatchling"]
