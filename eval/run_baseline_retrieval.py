@@ -15,7 +15,7 @@ from eval.common import (
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Baseline retrieval for CliniRAG eval lab")
+    parser = argparse.ArgumentParser(description="Baseline retrieval for GlucoRAG eval lab")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument(
         "--out",

@@ -1,4 +1,4 @@
-"""Shared helpers for the CliniRAG retrieval evaluation lab."""
+"""Shared helpers for the GlucoRAG retrieval evaluation lab."""
 
 from __future__ import annotations
 
