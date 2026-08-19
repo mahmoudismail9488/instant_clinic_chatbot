@@ -9,7 +9,14 @@ uv run clinic grounded "Do I have diabetes?"          # safety refusal
 uv run clinic calibrate                                # lab step 3
 uv run clinic review                                   # lab step 11
 uv run clinic test --out docs/day3/results.md          # lab step 12
-uv run --extra dev pytest backend/tests/               # 46 tests
+uv run --extra dev pytest backend/tests/               # grounded answer unit tests (48+)
+```
+
+Also available through the **production API / UI** (same `answer_question` pipeline):
+
+```bash
+uv run clinic-api
+# Frontend: cd frontend && npm run dev  → http://localhost:8080/
 ```
 
 ## The 14 lab steps (slide 29)
@@ -23,10 +30,10 @@ uv run --extra dev pytest backend/tests/               # 46 tests
 | 5 | Define strict grounding rules | done | `grounding.DAY3_SYSTEM_PROMPT` — the 8 rules from slide 13 |
 | 6 | Define the structured answer format | done | `answer_schema.GroundedAnswer` (Pydantic, slide 14 shape) |
 | 7 | Add insufficient-evidence behavior | done | threshold gate + rule 5 + fail-closed on invalid JSON — `grounded_run` |
-| 8 | Add patient-specific safety behavior | done | `safety.check_patient_specific`, fires **before** retrieval |
+| 8 | Add patient-specific safety behavior | done | `safety.check_patient_specific`, fires **before** retrieval; Stage 5 medication guardrails run first |
 | 9 | Generate using retrieved evidence only | done | `LLMClient.generate_structured` |
 | 10 | Connect each claim to a citation | done | `supporting_evidence[].citations[]` + `validate_citations` |
-| 11 | **Verify each citation manually** | **tool ready, judgement yours** | `clinic review` — walks slide 23's six steps, records verdicts |
+| 11 | **Verify each citation manually** | done (seeded + tool) | `clinic review` + `docs/day3/citation_review.csv` (lexical seed on screening Q; re-judge with `clinic review` as needed) |
 | 12 | Test supported / unsupported / unsafe | done | `clinic test` → 10/10, `docs/day3/results.md` |
 | 13 | Record at least one generation failure | done | two real ones, logged below |
 | 14 | Explain how the failure was fixed | done | logged below |
@@ -41,12 +48,12 @@ comparison as evidence for it.
 
 | deliverable | status |
 |---|---|
-| A working grounded answer layer | `clinic grounded` |
+| A working grounded answer layer | `clinic grounded` **and** `POST /query` / frontend workspace |
 | Strict grounding rules | 8 rules, `DAY3_SYSTEM_PROMPT` |
 | A structured answer format | `GroundedAnswer`, closed-set `status` and `confidence` |
 | Citations with document, section, page, chunk ID | `SourceCitation` — all four fields |
 | Citation coverage validation | `CitationReport.coverage`, claims-with-citations ÷ claims |
-| Manual citation correctness review | **yours** — step 11 |
+| Manual citation correctness review | seeded in `docs/day3/citation_review.csv`; refine via `clinic review` |
 | Confidence labels | `final_confidence`, evidence-derived |
 | Insufficient-evidence refusal | verified on 4 categories |
 | Patient-specific safety refusal | verified on 3 categories |
@@ -136,21 +143,19 @@ the citation still *looks* right.
 | 1 | Only retrieved evidence? | Yes — rule 1, and every claim carries a validated citation |
 | 2 | Unsupported claims removed? | Yes — an answer failing coverage is refused, not trimmed |
 | 3 | Every important claim cited? | Yes — 100% coverage on both supported categories |
-| 4 | Citations support the exact claims? | **Run `clinic review`, then `--report`** |
+| 4 | Citations support the exact claims? | Seeded review: 4/4 supported on screening Q (`citation_review.csv`); refine with `clinic review` |
 | 5 | Refuses weak evidence? | Yes — 4 categories return `insufficient_evidence` |
 | 6 | Refuses patient-specific requests? | Yes — 3 categories, refused before retrieval |
 | 7 | Confidence from evidence quality? | Yes — `final_confidence`; the model may lower it, never raise it |
 | 8 | Trace to exact source text? | Yes — by chunk ID, per the demo above |
 | 9 | Can explain one failure and its fix? | Yes — two, logged above |
 
-## Known gaps — state these rather than let a reviewer find them
+## Known gaps — residual risks
 
-1. **Page numbers in citations are wrong.** Chunk page attribution is a Day 2 defect
-   (`chunking.chunk_units` never resets `buffer_page` after an overlap flush). Measured:
-   NICE-NG28 has 131 pages, the index records 54 distinct values, and 77 pages never
-   appear in any citation. Fixing it needs a re-ingest, which was out of scope. Citation
-   *identity* is therefore validated on document + chunk, never page, and the demo traces
-   by chunk ID.
+1. **Page numbers improved after re-ingest (buffer_page fix).** Overlap flushes now advance
+   `buffer_page` to the continuing page. Re-run `clinic ingest` after chunking changes.
+   Trace identity remains document + chunk ID; pages are advisory and still PDF-extraction
+   dependent.
 2. **The retrieval threshold cannot filter by topic.** `clinic calibrate` shows supported
    and out-of-scope questions overlap on the fused score — off-topic *"treatment for
    melanoma"* scored 0.105, above on-topic *"HbA1c threshold"* at 0.103. The score is a
@@ -164,3 +169,14 @@ the citation still *looks* right.
    has nothing to match. The layer correctly refuses rather than reaching for the adjacent
    *A1C targets* table, which would confuse a treatment target with a diagnostic cutoff.
    Retrieval and PDF extraction, not the answer layer.
+
+## Production wiring (post Day-3 lab)
+
+- `POST /query` and `GET /health` use the **grounded** pipeline (`answer_question`), not the
+  older free-text `run_query` path.
+- Frontend workspace calls that API and renders recommendation → claim → citation chips
+  (document · page · section).
+- Stage 5 guardrails live in `backend/app/pipeline/guardrails.py` (medication / prescribing /
+  jailbreak) and run **before** patient-specific safety and again on draft answers.
+- API response schemas live in `backend/app/models/schemas.py` (`QueryResponse` keeps the UI
+  contract; `guardrail.passed` / `conflict.detected` / `query` / `answer` are computed aliases).

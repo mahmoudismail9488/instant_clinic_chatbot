@@ -1,0 +1,5 @@
+question,claim,document,chunk,store_id,supported,failure_mode,notes
+Who should be screened for type 2 diabetes?,Adults aged 40 years or older should be screened for type 2 diabetes.,Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf,CH-0012,Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf::12,1,,auto_lexical_overlap=0.44
+Who should be screened for type 2 diabetes?,Adults under 40 years should be screened only if they have high risk (presence of risk factors).,Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf,CH-0012,Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf::12,1,,auto_lexical_overlap=0.42
+Who should be screened for type 2 diabetes?,Screening interval is every 3 years for high‑risk individuals and every 6–12 months for very high‑risk individuals.,Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf,CH-0012,Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf::12,1,,auto_lexical_overlap=0.82
+Who should be screened for type 2 diabetes?,"A validated risk calculator (e.g., CANRISK) should be used to assess risk.",Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf,CH-0012,Diabetes-Canada-2024-CPG-Quick-Reference-Guide.pdf::12,1,,auto_lexical_overlap=0.57
