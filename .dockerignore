@@ -1,0 +1,10 @@
+.venv
+**/__pycache__
+**/*.pyc
+.git
+.cursor
+frontend/node_modules
+frontend/.output
+graphify-out
+**/.env
+backend/app/.env

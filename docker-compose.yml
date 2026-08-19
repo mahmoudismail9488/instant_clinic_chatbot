@@ -1,0 +1,21 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/app/.env
+    environment:
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,https://*.vercel.app"
+      CORS_ORIGIN_REGEX: "https://.*\\.vercel\\.app"
+    volumes:
+      # Hot-swap index without rebuild (optional)
+      - ./data/index:/app/data/index:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

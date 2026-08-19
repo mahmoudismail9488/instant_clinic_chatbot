@@ -1,1 +1,1 @@
-"""Instant Clinic backend package."""
+"""GlucoRAG backend package."""
