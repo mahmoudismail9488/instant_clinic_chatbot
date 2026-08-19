@@ -94,7 +94,6 @@ llm_cache.db
 .semantic_cache/
 
 # ---------- Model & embedding downloads ----------
-models/
 checkpoints/
 *.bin
 *.gguf

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# AWS-ready CliniRAG API image (App Runner / ECS Fargate / EC2).
+# AWS-ready GlucoRAG API image (App Runner / ECS Fargate / EC2).
 FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv then project deps
+# Install uv then project deps (API runtime only — no torch/CUDA eval extras)
 COPY --from=ghcr.io/astral-sh/uv:0.8.4 /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock README.md ./
 COPY backend ./backend

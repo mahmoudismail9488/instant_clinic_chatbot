@@ -8,7 +8,7 @@ services:
     environment:
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
-      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,https://*.vercel.app"
+      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
       CORS_ORIGIN_REGEX: "https://.*\\.vercel\\.app"
     volumes:
       # Hot-swap index without rebuild (optional)
