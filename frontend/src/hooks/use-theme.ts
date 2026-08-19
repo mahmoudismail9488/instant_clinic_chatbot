@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export type Theme = "light" | "dark";
 
-export const THEME_STORAGE_KEY = "clinirag-theme";
+export const THEME_STORAGE_KEY = "glucorag-theme";
 
 function resolveInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";

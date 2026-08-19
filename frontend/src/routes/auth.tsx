@@ -12,13 +12,13 @@ export const Route = createFileRoute("/auth")({
     typeof search["redirect"] === "string" ? { redirect: search["redirect"] } : {},
   head: () => ({
     meta: [
-      { title: "Sign in — CliniRAG Clinical Assistant" },
+      { title: "Sign in — GlucoRAG Clinical Assistant" },
       {
         name: "description",
         content:
-          "Sign in to CliniRAG with email or Google to query evidence-grounded clinical guideline answers.",
+          "Sign in to GlucoRAG with email or Google to query evidence-grounded clinical guideline answers.",
       },
-      { property: "og:title", content: "Sign in — CliniRAG" },
+      { property: "og:title", content: "Sign in — GlucoRAG" },
       {
         property: "og:description",
         content: "Email or Google sign-in for the evidence-grounded clinical guideline assistant.",
@@ -89,7 +89,7 @@ function AuthPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16">
       <div className="w-full max-w-[420px]">
-        <p className="font-mono text-[12px] uppercase tracking-wide text-primary">CliniRAG · Access</p>
+        <p className="font-mono text-[12px] uppercase tracking-wide text-primary">GlucoRAG · Access</p>
         <h1 className="mt-3 text-[28px] font-semibold leading-tight text-foreground">
           {mode === "signin" ? "Sign in to your workspace" : "Create your clinician account"}
         </h1>
