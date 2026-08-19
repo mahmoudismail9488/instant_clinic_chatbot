@@ -72,14 +72,19 @@ function persistLocal(userId: string, session: ChatSession): ChatSession {
 }
 
 export async function listChatSessions(userId: string): Promise<ChatSession[]> {
-  const { data, error } = await supabase
-    .from("chat_sessions")
-    .select("id, title, topic, turns, created_at, updated_at")
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .select("id, title, topic, turns, created_at, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false });
 
-  if (!error && data) {
-    return data.map(mapRow);
+    // PGRST205 = table missing from schema cache — fall back quietly.
+    if (!error && data) {
+      return data.map(mapRow);
+    }
+  } catch {
+    /* network / client errors → local */
   }
   return readLocal(userId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }

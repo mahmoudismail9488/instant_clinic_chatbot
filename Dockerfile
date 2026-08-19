@@ -34,4 +34,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 
-CMD ["uv", "run", "clinic-api"]
+# Use the venv binary directly (avoid `uv run` rebuild delay on every boot).
+CMD [".venv/bin/clinic-api"]
