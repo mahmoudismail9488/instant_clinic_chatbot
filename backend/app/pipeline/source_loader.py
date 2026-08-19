@@ -47,6 +47,9 @@ def _load_pdf_units(path: Path) -> list[PageUnit]:
     units: list[PageUnit] = []
     for page_num, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
+        # Soften common PDF extraction glue so section detectors can fire.
+        text = text.replace("\xa0", " ")
+        text = text.replace("UPDATED FOR 2025How", "UPDATED FOR 2025\nHow")
         if text.strip():
             units.append(PageUnit(text=text, page=page_num))
     return units

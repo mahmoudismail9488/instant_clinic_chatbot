@@ -1,7 +1,7 @@
 [project]
-name = "instant-clinic-chatbot"
+name = "glucorag"
 version = "0.1.0"
-description = "Guideline-grounded clinical chatbot with admin source ingestion"
+description = "GlucoRAG — guideline-grounded diabetes clinical assistant"
 readme = "README.md"
 authors = [
     { name = "Ahmed Nagah", email = "ahmednagah031220@gmail.com" }

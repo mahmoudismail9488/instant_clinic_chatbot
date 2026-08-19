@@ -37,7 +37,7 @@ def _save_labels(df: pd.DataFrame, path: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Manual relevance labeling for CliniRAG eval")
+    parser = argparse.ArgumentParser(description="Manual relevance labeling for GlucoRAG eval")
     parser.add_argument(
         "--retrieval",
         action="append",

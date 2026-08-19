@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "CliniRAG — Evidence-Grounded Clinical Assistant" },
+      { title: "GlucoRAG — Evidence-Grounded Clinical Assistant" },
       {
         name: "description",
         content: "Clinical guideline answers traceable to WHO, CDC, NICE and USPSTF source text.",
@@ -113,7 +113,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('clinirag-theme');var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d){document.documentElement.classList.add('dark');}document.documentElement.style.colorScheme=d?'dark':'light';}catch(e){}})();`,
+            __html: `(function(){try{var s=localStorage.getItem('glucorag-theme');var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d){document.documentElement.classList.add('dark');}document.documentElement.style.colorScheme=d?'dark':'light';}catch(e){}})();`,
           }}
         />
       </head>

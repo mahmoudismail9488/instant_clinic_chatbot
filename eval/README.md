@@ -1,4 +1,4 @@
-# CliniRAG retrieval evaluation lab
+# GlucoRAG retrieval evaluation lab
 
 Scripts in `eval/` · artifacts in `eval/outputs/`.
 

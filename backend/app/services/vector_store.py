@@ -8,8 +8,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from rank_bm25 import BM25Okapi
 
 from backend.app.config import get_settings
+from backend.app.pipeline.hybrid_search import build_bm25
 
 
 @dataclass
@@ -31,21 +33,29 @@ class VectorStore:
         self._emb_path = self.index_dir / "embeddings.npy"
         self._chunks: list[StoredChunk] = []
         self._embeddings: np.ndarray | None = None
+        self._bm25: BM25Okapi | None = None
+        self._bm25_docs: list[dict[str, Any]] | None = None
         self.load()
 
     @property
     def size(self) -> int:
         return len(self._chunks)
 
+    def _invalidate_lexical(self) -> None:
+        self._bm25 = None
+        self._bm25_docs = None
+
     def clear(self) -> None:
         self._chunks = []
         self._embeddings = None
+        self._invalidate_lexical()
         if self._meta_path.exists():
             self._meta_path.unlink()
         if self._emb_path.exists():
             self._emb_path.unlink()
 
     def load(self) -> None:
+        self._invalidate_lexical()
         if not self._meta_path.exists() or not self._emb_path.exists():
             self._chunks = []
             self._embeddings = None
@@ -93,6 +103,7 @@ class VectorStore:
         else:
             self._chunks.extend(new_chunks)
             self._embeddings = np.vstack([self._embeddings, matrix])
+        self._invalidate_lexical()
         self.save()
 
     def similarity_search(
@@ -149,3 +160,12 @@ class VectorStore:
                 }
             )
         return results
+
+    def get_bm25(self) -> tuple[BM25Okapi | None, list[dict[str, Any]]]:
+        """Cached BM25 index over the full corpus (rebuilt after load/upsert/clear)."""
+        if self._bm25 is not None and self._bm25_docs is not None:
+            return self._bm25, self._bm25_docs
+        docs = self.get_all_documents()
+        self._bm25_docs = docs
+        self._bm25 = build_bm25(docs)
+        return self._bm25, docs
