@@ -177,7 +177,7 @@ class LLMClient:
 
     def generate(self, *, query: str, context: str) -> str:
         system = (
-            "You are Instant Clinic, a clinical decision-support assistant. "
+            "You are GlucoRAG, a clinical decision-support assistant. "
             "Answer ONLY using the provided guideline excerpts. "
             "If the excerpts are insufficient, say you cannot find supporting guidance. "
             "Be concise, cite source filenames inline when possible, "

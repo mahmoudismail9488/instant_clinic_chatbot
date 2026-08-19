@@ -148,7 +148,12 @@ def _render_grounded(result: GroundedResult, *, show_evidence: bool = True) -> s
 
 
 def cmd_grounded(args: argparse.Namespace) -> int:
-    result = answer_question(args.question, top_k=args.top_k, threshold=args.threshold)
+    result = answer_question(
+        args.question,
+        top_k=args.top_k,
+        threshold=args.threshold,
+        section_focus=getattr(args, "section_focus", None),
+    )
     if args.json:
         _emit(
             json.dumps(
@@ -433,10 +438,35 @@ def cmd_query(args: argparse.Namespace) -> int:
     return 0 if not result.blocked else 1
 
 
+def cmd_day4_eval(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from backend.app.pipeline.day4_eval import DEFAULT_BENCHMARK, DEFAULT_OUT, run_day4_eval
+
+    benchmark = Path(args.benchmark) if args.benchmark else DEFAULT_BENCHMARK
+    out = Path(args.out) if args.out else DEFAULT_OUT
+    _emit(f"Running Day 4 eval on {benchmark} …")
+    outcomes, summary = run_day4_eval(
+        benchmark=benchmark, out=out, top_k=args.top_k
+    )
+    _emit(
+        f"Done. {summary['n_questions']} questions · "
+        f"behavior={summary['behavior_pass_rate']:.0%} · "
+        f"safety={summary['safety_pass_rate']:.0%} · "
+        f"wrote {out}"
+    )
+    fails = [o for o in outcomes if not o.behavior_ok]
+    if fails:
+        _emit(f"{len(fails)} behavior mismatch(es):")
+        for o in fails[:8]:
+            _emit(f"  - {o.id}: expected {o.expected_behavior}, got {o.actual_behavior}")
+    return 0 if not fails else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="clinic",
-        description="Instant Clinic CLI — ingest guidelines and ask grounded questions.",
+        description="GlucoRAG CLI — ingest guidelines and ask grounded questions.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -465,6 +495,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     grounded.add_argument("question", help="Natural-language clinical question")
     grounded.add_argument("--top-k", type=int, default=None)
+    grounded.add_argument(
+        "--section-focus",
+        default=None,
+        choices=["screening", "diagnosis", "monitoring", "targets", "education"],
+        help="Soft hybrid retrieval bias toward matching guideline sections",
+    )
     grounded.add_argument(
         "--threshold",
         type=float,
@@ -507,6 +543,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--report", action="store_true", help="Print the correctness summary and exit"
     )
     review.set_defaults(func=cmd_review)
+
+    day4 = sub.add_parser(
+        "day4-eval",
+        help="Day 4 — run safety/evaluation benchmark (risk + faithfulness metrics)",
+    )
+    day4.add_argument(
+        "--benchmark",
+        default=None,
+        help="CSV path (default: eval/day4_benchmark.csv)",
+    )
+    day4.add_argument(
+        "--out",
+        default=None,
+        help="Markdown report path (default: docs/day4/EVALUATION_RESULTS.md)",
+    )
+    day4.add_argument("--top-k", type=int, default=None)
+    day4.set_defaults(func=cmd_day4_eval)
 
     return parser
 

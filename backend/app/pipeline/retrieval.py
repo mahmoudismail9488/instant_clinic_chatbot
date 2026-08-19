@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from backend.app.pipeline.chunking import infer_section_title
 from backend.app.pipeline.hybrid_search import rrf_hybrid_merge
+from backend.app.pipeline.section_focus import apply_section_bias
 from backend.app.services.llm_client import LLMClient
 from backend.app.services.vector_store import VectorStore
 
@@ -27,18 +28,30 @@ def retrieve(
     store: VectorStore | None = None,
     client: LLMClient | None = None,
     use_hybrid: bool = True,
+    section_focus: str | None = None,
 ) -> list[RetrievedChunk]:
     llm = client or LLMClient()
     vector_store = store or VectorStore()
 
+    # Over-fetch so section bias / hybrid fusion can re-rank before the cut.
+    pool = max(top_k * 4, 12)
     query_embedding = llm.embed([query])[0]
-    dense_hits = vector_store.similarity_search(query_embedding, top_k=top_k * 3)
+    dense_hits = vector_store.similarity_search(query_embedding, top_k=pool)
 
     if use_hybrid:
-        all_docs = vector_store.get_all_documents()
-        hits = rrf_hybrid_merge(dense_hits, all_docs, query=query, top_k=top_k)
+        bm25, all_docs = vector_store.get_bm25()
+        hits = rrf_hybrid_merge(
+            dense_hits,
+            all_docs,
+            query=query,
+            top_k=pool,
+            n_candidates=pool,
+            bm25=bm25,
+        )
     else:
-        hits = dense_hits[:top_k]
+        hits = dense_hits
+
+    hits = apply_section_bias(hits, section_focus)[:top_k]
 
     results: list[RetrievedChunk] = []
     for hit in hits:

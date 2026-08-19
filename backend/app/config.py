@@ -35,12 +35,17 @@ class Settings(BaseSettings):
     # HTTP API (frontend integration)
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_workers: int = 1
     # Vite often binds 5173 or 8080; comma-separated allow-list.
+    # Production: set to your Vercel URL(s), e.g. https://app.vercel.app
     cors_origins: str = (
         "http://localhost:8080,http://127.0.0.1:8080,"
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:3000,http://127.0.0.1:3000"
     )
+    cors_origin_regex: str = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+    # Optional public API base used in health details / deploy diagnostics
+    public_api_url: str = ""
 
 
 @lru_cache

@@ -109,7 +109,7 @@ def run_query(
     query_guard = check_query(original)
     if not query_guard.allowed:
         return QueryResult(
-            answer=f"Request blocked by guardrails: {query_guard.reason}",
+            answer=query_guard.reason or "Request blocked by guardrails.",
             chunks=[],
             original_query=original,
             rewritten_query=original,
@@ -134,7 +134,7 @@ def run_query(
     answer_guard = check_answer(answer)
     if not answer_guard.allowed:
         return QueryResult(
-            answer=f"Answer blocked by guardrails: {answer_guard.reason}",
+            answer=answer_guard.reason or "Answer blocked by guardrails.",
             chunks=chunks,
             original_query=original,
             rewritten_query=rewritten,

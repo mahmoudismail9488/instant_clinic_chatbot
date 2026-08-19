@@ -1,6 +1,8 @@
-"""FastAPI application entrypoint for CliniRAG."""
+"""FastAPI application entrypoint for GlucoRAG."""
 
 from __future__ import annotations
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,23 +10,35 @@ from fastapi.responses import RedirectResponse
 
 from backend.app.api.routes_query import router as query_router
 from backend.app.config import get_settings
+from backend.app.services.runtime import init_app_state, reset_app_state
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load index + LLM client once per worker process."""
+    get_settings.cache_clear()
+    state = init_app_state()
+    app.state.clinirag = state
+    yield
+    reset_app_state()
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="CliniRAG API",
-        description="Guideline-grounded retrieval + generation for Instant Clinic",
-        version="0.1.0",
+        title="GlucoRAG API",
+        description="Guideline-grounded retrieval + generation for GlucoRAG",
+        version="0.2.0",
+        lifespan=lifespan,
     )
-    # Local Vite (often :8080) → API (:8000) is always cross-origin.
-    # Browser fetch does not send cookies to the API, so credentials=False
-    # lets us allow all origins (avoids Disallowed CORS origin 400).
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    # Production: set CORS_ORIGINS to exact frontend origins (Vercel URL, custom domain).
+    # Local: keep localhost regex for Vite ports.
+    allow_regex = settings.cors_origin_regex.strip() or None
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins or ["*"],
-        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+        allow_origin_regex=allow_regex,
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -44,7 +58,6 @@ app = create_app()
 def main() -> None:
     import uvicorn
 
-    # Drop cached settings so .env / code CORS changes apply on restart.
     get_settings.cache_clear()
     settings = get_settings()
     uvicorn.run(
@@ -52,6 +65,7 @@ def main() -> None:
         host=settings.api_host,
         port=settings.api_port,
         reload=False,
+        workers=settings.api_workers,
     )
 
 

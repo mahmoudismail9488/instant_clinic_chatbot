@@ -31,17 +31,25 @@ from backend.app.pipeline.answer_schema import (
     refusal,
     validate_citations,
 )
+from backend.app.pipeline.claim_support import (
+    ClaimSupportReport,
+    check_unsupported_claims,
+    is_claim_supported,
+)
 from backend.app.pipeline.grounding import (
     DAY3_SYSTEM_PROMPT,
     build_grounded_context,
     build_user_message,
 )
+from backend.app.pipeline.guardrails import GuardrailResult, check_answer, check_query
 from backend.app.pipeline.retrieval import RetrievedChunk, retrieve
-from backend.app.pipeline.safety import (
-    SAFETY_REFUSAL_TEXT,
-    SafetyVerdict,
-    check_patient_specific,
+from backend.app.pipeline.risk_classification import (
+    RiskAction,
+    RiskVerdict,
+    classify_input_risk,
+    refusal_text_for,
 )
+from backend.app.pipeline.safety import SafetyVerdict, check_patient_specific
 from backend.app.services.llm_client import LLMClient, StructuredResult
 from backend.app.services.vector_store import VectorStore
 
@@ -85,7 +93,10 @@ class GroundedResult:
     retrieved: list[RetrievedChunk] = field(default_factory=list)
     used: list[RetrievedChunk] = field(default_factory=list)
     report: CitationReport | None = None
+    claim_support: ClaimSupportReport | None = None
     safety: SafetyVerdict | None = None
+    risk: RiskVerdict | None = None
+    guardrail: GuardrailResult | None = None
     structured: StructuredResult | None = None
     decision_path: tuple[str, ...] = ()
     # The model's original answer when rejected at flow steps 9-10. Kept so the failure
@@ -138,6 +149,7 @@ def answer_question(
     settings: Settings | None = None,
     store: VectorStore | None = None,
     client: LLMClient | None = None,
+    section_focus: str | None = None,
 ) -> GroundedResult:
     """Run one clinical question through the full Day 3 decision flow."""
     cfg = settings or get_settings()
@@ -158,7 +170,44 @@ def answer_question(
             decision_path=tuple(path + ["empty question"]),
         )
 
-    # --- flow step 2: patient-specific check, BEFORE retrieval -----------------------
+    # --- Day 4 input risk classification (before retrieval) -------------------------
+    risk = classify_input_risk(asked)
+    path.append(f"1a. risk={risk.category.value}/{risk.level.value}")
+    if risk.action is not RiskAction.CONTINUE:
+        return GroundedResult(
+            question=asked,
+            answer=refusal(
+                AnswerStatus.SAFETY_REFUSAL,
+                refusal_text_for(risk),
+                missing_information=[risk.reason],
+            ),
+            threshold=cutoff,
+            risk=risk,
+            decision_path=tuple(
+                path + [f"-> risk {risk.action.value} ({risk.category.value})"]
+            ),
+        )
+
+    # Defense in depth: legacy Stage 5 phrase lists + patient-specific regexes.
+    query_guard = check_query(asked)
+    path.append("1b. query guardrails")
+    if not query_guard.allowed:
+        return GroundedResult(
+            question=asked,
+            answer=refusal(
+                AnswerStatus.SAFETY_REFUSAL,
+                query_guard.reason or "Request blocked by guardrails.",
+                missing_information=[
+                    "This assistant does not provide prescriptions, dosages, or "
+                    "personalized medication advice."
+                ],
+            ),
+            threshold=cutoff,
+            risk=risk,
+            guardrail=query_guard,
+            decision_path=tuple(path + [f"-> guardrail refusal ({query_guard.reason})"]),
+        )
+
     verdict = check_patient_specific(asked)
     path.append("2. patient-specific check")
     if verdict.patient_specific:
@@ -166,21 +215,36 @@ def answer_question(
             question=asked,
             answer=refusal(
                 AnswerStatus.SAFETY_REFUSAL,
-                SAFETY_REFUSAL_TEXT,
+                refusal_text_for(risk)
+                if risk.action is not RiskAction.CONTINUE
+                else (
+                    "I cannot provide a patient-specific diagnosis, prescription, dosage, "
+                    "or treatment selection. Please consult a qualified clinician."
+                ),
                 missing_information=[
                     "A qualified clinician must assess the individual case."
                 ],
             ),
             threshold=cutoff,
+            risk=risk,
             safety=verdict,
+            guardrail=query_guard,
             decision_path=tuple(path + [f"-> safety refusal ({verdict.reason})"]),
         )
 
     # --- flow step 4: retrieve --------------------------------------------------------
     # The raw question is used, not a rewrite: slide 14 specifies {question} untouched.
+    # Hybrid dense+BM25 RRF, optionally re-ranked by section_focus chips.
     llm = client or LLMClient(cfg)
-    retrieved = retrieve(asked, top_k=k, store=store, client=llm)
-    path.append(f"4. retrieved {len(retrieved)} chunks")
+    retrieved = retrieve(
+        asked,
+        top_k=k,
+        store=store,
+        client=llm,
+        section_focus=section_focus,
+    )
+    focus_note = f", focus={section_focus}" if section_focus else ""
+    path.append(f"4. retrieved {len(retrieved)} chunks (hybrid{focus_note})")
 
     unique = dedupe_chunks(retrieved)
     if len(unique) != len(retrieved):
@@ -204,7 +268,9 @@ def answer_question(
             ),
             threshold=cutoff,
             retrieved=retrieved,
+            risk=risk,
             safety=verdict,
+            guardrail=query_guard,
             decision_path=tuple(path + ["-> insufficient evidence"]),
         )
 
@@ -229,7 +295,9 @@ def answer_question(
             threshold=cutoff,
             retrieved=retrieved,
             used=usable,
+            risk=risk,
             safety=verdict,
+            guardrail=query_guard,
             structured=structured,
             decision_path=tuple(path + ["-> generation failed, refused"]),
         )
@@ -244,9 +312,35 @@ def answer_question(
             threshold=cutoff,
             retrieved=retrieved,
             used=usable,
+            risk=risk,
             safety=verdict,
+            guardrail=query_guard,
             structured=structured,
             decision_path=tuple(path + [f"-> model returned {answer.status.value}"]),
+        )
+
+    # --- stage 5 answer guardrails (block prescribing language in drafts) ------------
+    answer_guard = check_answer(answer.recommendation)
+    path.append("8b. answer guardrails")
+    if not answer_guard.allowed:
+        return GroundedResult(
+            question=asked,
+            answer=refusal(
+                AnswerStatus.SAFETY_REFUSAL,
+                answer_guard.reason or "Answer blocked by guardrails.",
+                missing_information=[
+                    "Generated text looked like a prescription or dosing instruction."
+                ],
+            ),
+            threshold=cutoff,
+            retrieved=retrieved,
+            used=usable,
+            risk=risk,
+            safety=verdict,
+            guardrail=answer_guard,
+            structured=structured,
+            rejected_answer=answer,
+            decision_path=tuple(path + ["-> answer guardrail refusal"]),
         )
 
     # --- flow steps 9-10: citation coverage and correctness --------------------------
@@ -271,10 +365,52 @@ def answer_question(
             retrieved=retrieved,
             used=usable,
             report=report,
+            risk=risk,
             safety=verdict,
+            guardrail=query_guard,
             structured=structured,
             rejected_answer=answer,
             decision_path=tuple(path + ["-> citation validation failed, refused"]),
+        )
+
+    # --- Day 4 unsupported-claim heuristic (second safety net) ------------------------
+    evidence_blob = "\n".join(c.text for c in usable)
+    claim_texts = [item.claim for item in answer.supporting_evidence]
+    if claim_texts:
+        unsupported = tuple(
+            c for c in claim_texts if not is_claim_supported(c, evidence_blob)
+        )
+        claim_report = ClaimSupportReport(
+            claims=tuple(claim_texts), unsupported=unsupported
+        )
+    else:
+        claim_report = check_unsupported_claims(answer.recommendation, evidence_blob)
+    path.append(
+        f"11. claim support faithfulness={claim_report.faithfulness:.0%}, "
+        f"unsupported={len(claim_report.unsupported)}"
+    )
+    if not claim_report.passed:
+        return GroundedResult(
+            question=asked,
+            answer=refusal(
+                AnswerStatus.INSUFFICIENT_EVIDENCE,
+                INSUFFICIENT_EVIDENCE_TEXT,
+                missing_information=[
+                    "Post-generation claim support check flagged unsupported claim(s):",
+                    *[f"- {c}" for c in claim_report.unsupported[:3]],
+                ],
+            ),
+            threshold=cutoff,
+            retrieved=retrieved,
+            used=usable,
+            report=report,
+            claim_support=claim_report,
+            risk=risk,
+            safety=verdict,
+            guardrail=query_guard,
+            structured=structured,
+            rejected_answer=answer,
+            decision_path=tuple(path + ["-> unsupported claims, refused"]),
         )
 
     # --- flow step 12: grounded answer, confidence derived from evidence -------------
@@ -290,7 +426,10 @@ def answer_question(
         retrieved=retrieved,
         used=usable,
         report=report,
+        claim_support=claim_report,
+        risk=risk,
         safety=verdict,
+        guardrail=query_guard,
         structured=structured,
         decision_path=tuple(path),
     )
